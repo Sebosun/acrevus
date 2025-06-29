@@ -16,6 +16,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		// The "up" and "k" keys move the cursor up
+		//
+		case "left", "h":
+			m.cursor = 0
+			m.selected = m.cursor
+			m.isReading = false
+
+		case "right", "l":
+			m.cursor = 0
+			m.selected = m.cursor
+			m.isReading = true
+
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -23,21 +34,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// The "down" and "j" keys move the cursor down
 		case "down", "j":
-			m.cursor++
-
-		// The "enter" key and the spacebar (a literal space) toggle
-		// the selected state for the item that the cursor is pointing at.
-		case "enter", " ":
-			_, ok := m.selected[m.cursor]
-			if ok {
-				delete(m.selected, m.cursor)
+			if !m.isReading {
+				if m.cursor < len(m.articles)-1 {
+					m.cursor++
+				}
 			} else {
-				m.selected[m.cursor] = struct{}{}
+				m.cursor++
 			}
+
 		}
 	}
 
 	// Return the updated model to the Bubble Tea runtime for processing.
 	// Note that we're not returning a command.
 	return m, nil
+}
+
+func (m model) getArticleByIndex() {
 }

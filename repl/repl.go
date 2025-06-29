@@ -8,6 +8,7 @@ package repl
 import (
 	"fmt"
 	"os"
+	"sebosun/acrevus-go/storage"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -18,24 +19,34 @@ type Sizes struct {
 }
 
 type model struct {
-	sizes       Sizes
-	totalHeight int              // 0-1000 whatever
-	scroll      int              // 0-1000 whatever
-	choices     []string         // items on the to-do list
-	cursor      int              // which to-do list item our cursor is pointing at
-	selected    map[int]struct{} // which to-do items are selected
+	sizes   Sizes
+	scroll  int      // 0-1000 whatever
+	choices []string // items on the to-do list
+	cursor  int      // which to-do list item our cursor is pointing at
+
+	curArticle storage.Entry
+	selected   int // which article is being read
+	articles   []storage.Entry
+	isReading  bool
 }
 
-func initialModel() model {
+func initialModel(fileData storage.FileData) model {
+	choices := []string{}
+
+	for _, v := range fileData.Entries {
+		choices = append(choices, v.Title)
+	}
+
 	return model{
 		// Our to-do list is a grocery list
-		cursor:      20,
-		totalHeight: 500,
-		choices:     []string{"Buy carrots", "Buy celery", "Buy kohlrabi", "lmaoooooo"},
+		cursor:  0,
+		choices: choices,
 		// A map which indicates which choices are selected. We're using
 		// the  map like a mathematical set. The keys refer to the indexes
 		// of the `choices` slice, above.
-		selected: make(map[int]struct{}),
+		selected:  0,
+		articles:  fileData.Entries,
+		isReading: false,
 	}
 }
 
@@ -45,7 +56,12 @@ func (m model) Init() tea.Cmd {
 }
 
 func InitTea() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	fileData, err := storage.GetFileData()
+	if err != nil {
+		fmt.Printf("Error initalizing Tea from filedata: %v", err)
+		os.Exit(1)
+	}
+	p := tea.NewProgram(initialModel(fileData), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)

@@ -1,3 +1,4 @@
+// Package storage handles saivng and reading from drive
 package storage
 
 import (
@@ -37,7 +38,7 @@ func EnsureFilesExist() (FileData, error) {
 		return FileData{}, err
 	}
 
-	data, err := getFileData()
+	data, err := GetFileData()
 	if err != nil {
 		return FileData{}, err
 	}
@@ -136,7 +137,7 @@ func createDataFile(path string) (bool, error) {
 	return true, nil
 }
 
-func getFileData() (FileData, error) {
+func GetFileData() (FileData, error) {
 	path, err := getEntriesJSONPath()
 	if err != nil {
 		return FileData{}, err
@@ -157,7 +158,7 @@ func getFileData() (FileData, error) {
 }
 
 func SaveArticle(filename string, entry Entry, data []string) error {
-	fileData, err := getFileData()
+	fileData, err := GetFileData()
 	fileData.Entries = append(fileData.Entries, entry)
 	if err != nil {
 		return err
@@ -215,7 +216,7 @@ func SaveArticle(filename string, entry Entry, data []string) error {
 }
 
 func IsURLSaved(url string) (bool, error) {
-	data, err := getFileData()
+	data, err := GetFileData()
 	if err != nil {
 		return false, fmt.Errorf("failed to create file: %w", err)
 	}

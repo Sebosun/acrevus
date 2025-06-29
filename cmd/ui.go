@@ -11,6 +11,5 @@ var uiCmd = &cobra.Command{
 	Short: "Show Acrevus UI",
 	Run: func(cmd *cobra.Command, args []string) {
 		repl.InitTea()
-		// Your root command logic here
 	},
 }
