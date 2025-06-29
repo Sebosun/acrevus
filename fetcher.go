@@ -9,7 +9,7 @@ import (
 	"github.com/go-rod/rod"
 )
 
-func initFetcher(run bool) error {
+func InitFetcher(url string, run bool) error {
 	if !run {
 		return nil
 	}
@@ -49,7 +49,7 @@ func initFetcher(run bool) error {
 	saveTime := strconv.Itoa(time.Now().YearDay())
 	fileName := fmt.Sprintf("%s - %s.html", title, saveTime)
 
-	entry := Entry{Title: title, Subtitle: subtitle, Path: fileName}
+	entry := Entry{Title: title, Subtitle: subtitle, Path: fileName, OriginalURL: url}
 
 	err := saveArticle(fileName, entry, htmlAcc)
 	if err != nil {

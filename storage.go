@@ -9,9 +9,10 @@ import (
 )
 
 type Entry struct {
-	Title    string `json:"title"`
-	Subtitle string `json:"subtitle"`
-	Path     string `json:"path"`
+	Title       string `json:"title"`
+	Subtitle    string `json:"subtitle"`
+	Path        string `json:"path"`
+	OriginalURL string `json:"originalUrl"`
 }
 
 type FileData struct {
