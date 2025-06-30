@@ -50,7 +50,7 @@ func (m model) updatePreview(msg tea.Msg) (model, tea.Cmd) {
 			return m, tea.Quit
 		case "right", "l":
 			m.selected = m.cursor
-			m.cursor = 5
+			m.cursor = 0
 			m.isReading = true
 		case "up", "k":
 			if m.cursor > 0 {

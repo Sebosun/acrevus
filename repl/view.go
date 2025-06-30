@@ -49,7 +49,7 @@ func (m model) PreviewView() string {
 		s += fmt.Sprintf("[ ] %d. %s \n", i+1, v.Title)
 	}
 
-	s += fmt.Sprintf("C[%d]\n", m.cursor)
+	// s += fmt.Sprintf("C[%d]\n", m.cursor)
 
 	return s
 }
