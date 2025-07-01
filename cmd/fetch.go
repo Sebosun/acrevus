@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sebosun/acrevus-go/analyzer"
 	"sebosun/acrevus-go/fetcher"
 	"sebosun/acrevus-go/storage"
 
@@ -37,5 +38,30 @@ var fetchCmd = &cobra.Command{
 		}
 
 		fetcher.InitFetcher(link)
+	},
+}
+
+var parseURL = &cobra.Command{
+	Use:   "parse [url]",
+	Short: "Parse a URL",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Running parser")
+		if len(args) > 1 {
+			fmt.Println("Multiple url links included, not supported yet")
+			os.Exit(0)
+		}
+		link := args[0]
+		_, err := url.ParseRequestURI(link)
+		if err != nil {
+			fmt.Println("Invalid url provided")
+			os.Exit(1)
+		}
+
+		err = analyzer.Run(link)
+		if err != nil {
+			fmt.Println("Error running analyzer")
+			os.Exit(1)
+		}
 	},
 }

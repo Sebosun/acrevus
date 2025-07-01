@@ -8,6 +8,7 @@ import (
 var rootCmd = &cobra.Command{Use: "app"}
 
 func Execute() {
+	rootCmd.AddCommand(parseURL)
 	rootCmd.AddCommand(fetchCmd)
 	rootCmd.AddCommand(uiCmd)
 	rootCmd.Execute()
