@@ -12,13 +12,9 @@ func (br *Scapper) generalParser(link string) error {
 	page := br.browser.MustPage(link).MustWindowFullscreen()
 	page.MustScreenshot("general-parser.png")
 
-	var title string
-	var subtitle string
-	var text string
-
-	text = page.MustElement("article").MustText()
-	title = page.MustElement("article h1").MustText()
-	subtitle = page.MustElement("article > h2,h3,h4,h5").MustText()
+	text := page.MustElement("article").MustText()
+	title := page.MustElement("article h1").MustText()
+	subtitle := page.MustElement("article > h2,h3,h4,h5").MustText()
 
 	fmt.Printf("Title %s \n", title)
 	fmt.Printf("Subtitle %s \n", subtitle)

@@ -42,8 +42,8 @@ var fetchCmd = &cobra.Command{
 }
 
 var parseURL = &cobra.Command{
-	Use:   "parse [url]",
-	Short: "Parse a URL",
+	Use:   "anal [url]",
+	Short: "Analyze a URL",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Running parser")
