@@ -18,6 +18,12 @@ func NewDensityAnalyzer(page *rod.Page) *DensityAnalyzer {
 	return &DensityAnalyzer{page: page}
 }
 
+type MainArticle struct {
+	Content ContentBlock
+	Title   string
+	Author  string
+}
+
 type ContentBlock struct {
 	Element     *rod.Element
 	TextContent string
@@ -28,12 +34,12 @@ type ContentBlock struct {
 	Area        float64
 }
 
-func (da *DensityAnalyzer) AnalyzeContentDensity() error {
+func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 	// body := da.page.MustElement("body")
 	// elems, err := body.Element("section")
 	elements, err := da.page.Elements("div, p, article, section, main, aside, header, footer")
 	if err != nil {
-		return err
+		return MainArticle{}, err
 	}
 
 	var blocks []ContentBlock
@@ -50,7 +56,7 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() error {
 	}
 
 	if len(blocks) == 0 {
-		return fmt.Errorf("no content blocks found")
+		return MainArticle{}, fmt.Errorf("no content blocks found")
 	}
 
 	maxDensity := 0.0
@@ -67,13 +73,22 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() error {
 			score *= 0.01
 		}
 
+		// Penalize p tags, likely to be part of article, rather than article itself
+		if block.TagName == "p" {
+			score *= 0.10
+		}
+
 		if block.TagName == "INVALID" {
 			score *= 0.05
 		}
 
 		// Prefer blocks with substantial text
-		if block.TextLength > 200 {
+		if block.TextLength > 1000 {
 			score *= 1.2
+		}
+
+		if block.TextLength > 5000 {
+			score *= 2
 		}
 
 		if score > maxDensity {
@@ -82,10 +97,16 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() error {
 		}
 	}
 
-	fmt.Printf("Len %d | Text first 10: %s\n", mainBlock.TextLength, mainBlock.TextContent)
-	fmt.Printf("Tag name %s | Score: %v | Max density %v \n", mainBlock.TagName, mainBlock.Density, maxDensity)
+	title := da.getTitle()
+	// fmt.Printf("Len %d | Text first 50: %s \t Last 10: %s\n", mainBlock.TextLength, mainBlock.TextContent[:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
+	// fmt.Printf("Tag name %s | Score: %v | Max density %v \n", mainBlock.TagName, mainBlock.Density, maxDensity)
+	art := MainArticle{
+		Content: *mainBlock,
+		Title:   title,
+		Author:  "",
+	}
 
-	return nil
+	return art, nil
 }
 
 func (da *DensityAnalyzer) analyzeElement(element *rod.Element) (ContentBlock, error) {
@@ -97,8 +118,15 @@ func (da *DensityAnalyzer) analyzeElement(element *rod.Element) (ContentBlock, e
 	cleanText := da.cleanText(textContent)
 	cleanLen := len(cleanText)
 
-	links, _ := element.Elements("a")
-	linkCount := len(links)
+	// TODO: don't penalize links, if their href is a navigator tag
+	// like so <li> <a href="#1" /> </li>
+	links := element.MustElements("a")
+	linkCount := 0
+
+	for _, v := range links {
+		href := v.MustEval(`() => this.href`).String()
+		fmt.Println(href)
+	}
 
 	box := element.MustShape().Box()
 	var area float64
@@ -174,9 +202,8 @@ func Run(link string) error {
 	page := browser.MustPage(link)
 	page.MustWaitLoad()
 
-	page.MustScreenshot("a.png")
 	analyzer := NewDensityAnalyzer(page)
-	err := analyzer.AnalyzeContentDensity()
+	_, err := analyzer.AnalyzeContentDensity()
 	if err != nil {
 		return fmt.Errorf("error running content analyzer %w", err)
 	}

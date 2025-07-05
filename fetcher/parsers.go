@@ -2,23 +2,40 @@ package fetcher
 
 import (
 	"fmt"
-	"sebosun/acrevus-go/storage"
-	"strconv"
-	"time"
+	"sebosun/acrevus-go/analyzer"
 )
 
+func (br *Scapper) generalParserAnalyze(link string) error {
+	page := br.browser.MustPage(link)
+	page.MustWaitLoad()
+	densityAnalyzer := analyzer.NewDensityAnalyzer(page)
+	article, err := densityAnalyzer.AnalyzeContentDensity()
+	if err != nil {
+		return fmt.Errorf("error running content analyzer %w", err)
+	}
+
+	data := SaveData{
+		title:    article.Title,
+		subtitle: "",
+		url:      link,
+		text:     article.Content.TextContent,
+	}
+
+	err = saveToDrive(data, []string{"2", "3"})
+	if err != nil {
+		return fmt.Errorf("error saving content via analyzer %w", err)
+	}
+
+	return nil
+}
+
 func (br *Scapper) generalParser(link string) error {
-	fmt.Println("Starting general parsing: ", link)
 	page := br.browser.MustPage(link).MustWindowFullscreen()
 	page.MustScreenshot("general-parser.png")
 
 	text := page.MustElement("article").MustText()
 	title := page.MustElement("article h1").MustText()
 	subtitle := page.MustElement("article > h2,h3,h4,h5").MustText()
-
-	fmt.Printf("Title %s \n", title)
-	fmt.Printf("Subtitle %s \n", subtitle)
-	fmt.Printf("Text %s \n", trimText(text))
 
 	htmlAcc := []string{}
 	for _, v := range page.MustElements("article") {
@@ -31,14 +48,16 @@ func (br *Scapper) generalParser(link string) error {
 		}
 	}
 
-	saveTime := strconv.Itoa(time.Now().YearDay())
-	fileName := fmt.Sprintf("%s - %s.html", title, saveTime)
+	data := SaveData{
+		title:    title,
+		subtitle: subtitle,
+		url:      link,
+		text:     text,
+	}
 
-	entry := storage.Entry{Title: title, Subtitle: subtitle, Path: fileName, OriginalURL: link, RawText: text}
-
-	err := storage.SaveArticle(fileName, entry, htmlAcc)
+	err := saveToDrive(data, htmlAcc)
 	if err != nil {
-		return err
+		return fmt.Errorf("error saving general parser article %w", err)
 	}
 
 	return nil
@@ -50,15 +69,13 @@ func (br *Scapper) substackParser(link string) error {
 	page := br.browser.MustPage(link).MustWindowFullscreen()
 	page.MustScreenshot("substack-parser.png")
 
-	var title string
-	var subtitle string
-	var text string
-
 	page.MustElement("article")
-	title = page.MustElement("article .post-title").MustText()
-	subtitle = page.MustElement("article .subtitle").MustText()
+	title := page.MustElement("article .post-title").MustText()
+	subtitle := page.MustElement("article .subtitle").MustText()
 
 	actualArticle := page.MustElement(".markup")
+	text := actualArticle.MustText()
+
 	elems := actualArticle.MustElements(":not(.subscription-widget-wrap)")
 
 	fmt.Println("Going through nodes", link)
@@ -73,25 +90,16 @@ func (br *Scapper) substackParser(link string) error {
 		}
 	}
 
-	fmt.Printf("\n")
-	fmt.Printf("Title %s \n", title)
-	fmt.Printf("Subtitle %s \n", subtitle)
-	fmt.Printf("Text %s \n", trimText(text))
-
-	saveTime := strconv.Itoa(time.Now().YearDay())
-	fileName := fmt.Sprintf("%s - %s.html", title, saveTime)
-
-	rawText, err := actualArticle.Text()
-	if err != nil {
-		return fmt.Errorf("err reading article text %w", err)
+	data := SaveData{
+		title:    title,
+		subtitle: subtitle,
+		url:      link,
+		text:     text,
 	}
 
-	entry := storage.Entry{Title: title, Subtitle: subtitle, Path: fileName, OriginalURL: link, RawText: rawText}
-
-	fmt.Println("Saving...")
-	err = storage.SaveArticle(fileName, entry, htmlAcc)
+	err := saveToDrive(data, htmlAcc)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error saving substack parser article %w", err)
 	}
 
 	return nil

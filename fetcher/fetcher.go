@@ -30,20 +30,8 @@ func InitFetcher(link string) error {
 	case "substack.com":
 		scrapper.substackParser(link)
 	default:
-		scrapper.generalParser(link)
+		scrapper.generalParserAnalyze(link)
 	}
 
 	return nil
-}
-
-func trimText(input string) string {
-	if len(input) == 0 {
-		return ""
-	}
-
-	acc := ""
-	for i := 0; i < 50 || i < len(input); i++ {
-		acc += string(input[i])
-	}
-	return acc
 }
