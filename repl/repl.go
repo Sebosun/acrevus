@@ -19,11 +19,11 @@ type Sizes struct {
 }
 
 type model struct {
-	sizes   Sizes
-	scroll  int      // 0-1000 whatever
-	choices []string // items on the to-do list
-	cursor  int      // which to-do list item our cursor is pointing at
-
+	sizes      Sizes
+	scroll     int      // 0-1000 whatever
+	choices    []string // items on the to-do list
+	cursor     int      // which to-do list item our cursor is pointing at
+	error      string
 	curArticle storage.Entry
 	selected   int // which article is being read
 	articles   []storage.Entry

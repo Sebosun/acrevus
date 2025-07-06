@@ -1,6 +1,10 @@
 package repl
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"fmt"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m, cmd := m.alwaysUpdate(msg)
@@ -46,6 +50,14 @@ func (m model) updatePreview(msg tea.Msg) (model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "d":
+			newFile, err := m.deleteArticle()
+			if err != nil {
+				// likely should have some codes for various errors etc
+				m.error = fmt.Sprintf("Error %v", err)
+			}
+			m.articles = newFile
+
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "right", "l":
