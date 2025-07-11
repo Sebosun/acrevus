@@ -4,6 +4,7 @@ package analyzer
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -22,6 +23,7 @@ type MainArticle struct {
 	Content ContentBlock
 	Title   string
 	Author  string
+	RawHTML string
 }
 
 type ContentBlock struct {
@@ -34,11 +36,10 @@ type ContentBlock struct {
 	Area        float64
 }
 
-// TODO: Rename
-func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
+func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	// body := da.page.MustElement("body")
 	// elems, err := body.Element("section")
-	elements, err := da.page.Elements("div, p, article, section, main, aside, header, footer")
+	elements, err := da.page.Elements("body, div, p, article, section, main, aside, header, footer")
 	if err != nil {
 		return MainArticle{}, err
 	}
@@ -65,68 +66,10 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 	var mainBlock *ContentBlock
 
 	fmt.Println("Weighing score based on elements...")
-	for i, block := range blocks {
-		score := block.Density
+	da.weighScoreByTag(&blocks)
 
-		if block.TagName == "article" || block.TagName == "main" {
-			score *= 1.5
-		}
-
-		if block.TagName == "option" || block.TagName == "select" || block.TagName == "li" || block.TagName == "ul" {
-			score *= 0.01
-		}
-
-		// Penalize p tags, likely to be part of article, rather than article itself
-		if block.TagName == "p" {
-			score *= 0.10
-		}
-
-		if block.TagName == "INVALID" {
-			score *= 0.05
-		}
-
-		// Prefer blocks with substantial text
-		if block.TextLength > 1000 {
-			score *= 1.2
-		}
-
-		if block.TextLength > 5000 {
-			score *= 2
-		}
-
-		if block.Element.MustEval(`() => this.id`).String() == "auditable" {
-			fmt.Println(score)
-		}
-
-		blocks[i].Density = score
-	}
-
-	fmt.Println("Redistributing score based on parentage...", len(blocks))
-	for _, block := range blocks {
-		parent, err := block.Element.Parent()
-		if err == nil {
-			for i, bl := range blocks {
-				if da.isSameElement(parent, bl.Element) {
-					blocks[i].Density += block.Density * 0.5
-				}
-				grandPar, err := parent.Parent()
-				if err != nil {
-					continue
-				}
-				if da.isSameElement(grandPar, bl.Element) {
-					blocks[i].Density += block.Density * 0.25
-				}
-
-				grandGrandPar, err := grandPar.Parent()
-				if err != nil {
-					continue
-				}
-				if da.isSameElement(grandGrandPar, bl.Element) {
-					blocks[i].Density += block.Density * 0.15
-				}
-			}
-		}
-	}
+	fmt.Println("Redistributing score based on parentage...")
+	da.redistributeToParents(&blocks)
 
 	fmt.Println("Choosing the winner...")
 	for i, block := range blocks {
@@ -140,13 +83,36 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 	title := da.getTitle()
 	// fmt.Printf("Len %d | Text first 50: %s \t Last 10: %s\n", mainBlock.TextLength, mainBlock.TextContent[:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
 	// fmt.Printf("Tag name %s | Score: %v | Max density %v \n", mainBlock.TagName, mainBlock.Density, maxDensity)
+	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
+
+	fmt.Println("Running cleanups...")
+	da.clean(mainBlock.Element, "form")
+	da.clean(mainBlock.Element, "fieldset")
+	da.clean(mainBlock.Element, "object")
+	da.clean(mainBlock.Element, "embed")
+	da.clean(mainBlock.Element, "footer")
+	da.clean(mainBlock.Element, "link")
+	da.clean(mainBlock.Element, "aside")
+	da.clean(mainBlock.Element, "iframe")
+	da.clean(mainBlock.Element, "input")
+	da.clean(mainBlock.Element, "textarea")
+	da.clean(mainBlock.Element, "select")
+	da.clean(mainBlock.Element, "button")
+	da.cleanBr(mainBlock.Element)
+
 	art := MainArticle{
 		Content: *mainBlock,
 		Title:   title,
 		Author:  "",
+		RawHTML: mainBlock.Element.MustHTML(),
 	}
 
-	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
+	file, err := os.Create("./temp.html")
+	if err != nil {
+		return art, err
+	}
+	defer file.Close()
+	file.Write([]byte(art.RawHTML))
 
 	return art, nil
 }
@@ -200,9 +166,9 @@ func (da *DensityAnalyzer) cleanText(text string) string {
 
 	// Remove common non-content patterns
 	patterns := []string{
-		`\b(click here|read more|continue reading|share|tweet|like|follow)\b`,
-		`\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b`, // dates
-		`\b\w+@\w+\.\w+\b`,                      // emails
+		TextRegex[ClickHere],
+		TextRegex[Dates],
+		TextRegex[Emails],
 	}
 
 	for _, pattern := range patterns {
@@ -267,7 +233,7 @@ func Run(link string) error {
 	page.MustWaitLoad()
 
 	analyzer := NewDensityAnalyzer(page)
-	_, err := analyzer.AnalyzeContentDensity()
+	_, err := analyzer.ParseContentDensity()
 	if err != nil {
 		return fmt.Errorf("error running content analyzer %w", err)
 	}
