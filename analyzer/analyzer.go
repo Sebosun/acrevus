@@ -45,13 +45,14 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 
 	var blocks []ContentBlock
 
+	fmt.Println("Calculating elements...")
 	for _, element := range elements {
 		block, err := da.analyzeElement(element)
 		if err != nil {
 			continue // Skip problematic elements
 		}
 
-		if block.TextLength > 15 { // Only consider blocks with meaningful text
+		if block.TextLength > 150 {
 			blocks = append(blocks, block)
 		}
 	}
@@ -63,39 +64,10 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 	maxDensity := 0.0
 	var mainBlock *ContentBlock
 
-	for _, block := range blocks {
-		parent, err := block.Element.Parent()
-		if err == nil {
-			parentID := parent.Object.ObjectID
-			for i, bl := range blocks {
-				blID := bl.Element.Object.ObjectID
-				if blID == parentID {
-					fmt.Println("par")
-					blocks[i].Density += block.Density * 0.5
-				}
-				grandPar, err := parent.Parent()
-				if err != nil {
-					continue
-				}
-				if blID == grandPar.Object.ObjectID {
-					fmt.Println("grand")
-					blocks[i].Density += block.Density * 0.25
-				}
-
-				grandGrandPar, err := grandPar.Parent()
-				if err != nil {
-					continue
-				}
-				if blID == grandGrandPar.Object.ObjectID {
-					fmt.Println("grand grand")
-					blocks[i].Density += block.Density * 0.15
-				}
-			}
-		}
-	}
-
+	fmt.Println("Weighing score based on elements...")
 	for i, block := range blocks {
 		score := block.Density
+
 		if block.TagName == "article" || block.TagName == "main" {
 			score *= 1.5
 		}
@@ -121,6 +93,44 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 		if block.TextLength > 5000 {
 			score *= 2
 		}
+
+		if block.Element.MustEval(`() => this.id`).String() == "auditable" {
+			fmt.Println(score)
+		}
+
+		blocks[i].Density = score
+	}
+
+	fmt.Println("Redistributing score based on parentage...", len(blocks))
+	for _, block := range blocks {
+		parent, err := block.Element.Parent()
+		if err == nil {
+			for i, bl := range blocks {
+				if da.isSameElement(parent, bl.Element) {
+					blocks[i].Density += block.Density * 0.5
+				}
+				grandPar, err := parent.Parent()
+				if err != nil {
+					continue
+				}
+				if da.isSameElement(grandPar, bl.Element) {
+					blocks[i].Density += block.Density * 0.25
+				}
+
+				grandGrandPar, err := grandPar.Parent()
+				if err != nil {
+					continue
+				}
+				if da.isSameElement(grandGrandPar, bl.Element) {
+					blocks[i].Density += block.Density * 0.15
+				}
+			}
+		}
+	}
+
+	fmt.Println("Choosing the winner...")
+	for i, block := range blocks {
+		score := block.Density
 		if score > maxDensity {
 			maxDensity = score
 			mainBlock = &blocks[i]
@@ -136,7 +146,7 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 		Author:  "",
 	}
 
-	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:20], mainBlock.TextContent[len(mainBlock.TextContent)-20:])
+	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
 
 	return art, nil
 }
@@ -222,6 +232,31 @@ func (da *DensityAnalyzer) calculateDensity(textLength, linkCount int, area floa
 	}
 
 	return baseDensity * linkPenalty * 1000
+}
+
+// ObjectId will not persist in between calls
+func (da *DensityAnalyzer) isSameElement(el1, el2 *rod.Element) bool {
+	prop1 := el1.MustEval(`() => 
+		this.id + "|" 
+		+ this.tagName + '|' 
+		+ this.className + '|' 
+		+ this.childElementCount + '|'
+		+ this.clientHeight + '|'
+		+ this.clientWidth + '|'
+		+ this.textContent.substring(0, 50)
+	`).String()
+
+	prop2 := el2.MustEval(`() => 
+		this.id + "|" 
+		+ this.tagName + '|' 
+		+ this.className + '|' 
+		+ this.childElementCount + '|'
+		+ this.clientHeight + '|'
+		+ this.clientWidth + '|'
+		+ this.textContent.substring(0, 50)
+	`).String()
+
+	return prop1 == prop2
 }
 
 func Run(link string) error {
