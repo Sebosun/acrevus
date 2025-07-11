@@ -21,7 +21,7 @@ func (br *Scapper) generalParserAnalyze(link string) error {
 		text:     article.Content.TextContent,
 	}
 
-	err = saveToDrive(data, []string{"2", "3"})
+	err = saveToDrive(data, []string{article.RawHTML})
 	if err != nil {
 		return fmt.Errorf("error saving content via analyzer %w", err)
 	}

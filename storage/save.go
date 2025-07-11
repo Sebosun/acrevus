@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 )
 
 func SaveArticle(filename string, entry Entry, data []string) error {
@@ -25,7 +26,8 @@ func saveArticle(filename string, html []string) error {
 		return err
 	}
 
-	articleFile, err := os.Create(articlesPath)
+	newArtPath := path.Join(articlesPath, filename)
+	articleFile, err := os.Create(newArtPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}

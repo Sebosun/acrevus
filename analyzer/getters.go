@@ -10,6 +10,15 @@ import (
 
 // Loose adapatation from mozilla/readibility
 func (da *DensityAnalyzer) getTitle() string {
+	dupa, err := da.page.Search("og:title")
+	if err == nil {
+		el := dupa.First
+		dupa, err := el.Attribute("content")
+		if err == nil {
+			return *dupa
+		}
+	}
+
 	title := da.page.MustInfo().Title
 	origTitle := title
 
