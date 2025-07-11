@@ -99,7 +99,7 @@ func (br *Scapper) substackParser(link string) error {
 
 	err := saveToDrive(data, htmlAcc)
 	if err != nil {
-		return fmt.Errorf("Error saving substack parser article %w", err)
+		return fmt.Errorf("error saving substack parser article %w", err)
 	}
 
 	return nil

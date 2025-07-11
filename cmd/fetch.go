@@ -42,11 +42,12 @@ var fetchCmd = &cobra.Command{
 }
 
 var parseURL = &cobra.Command{
-	Use:   "anal [url]",
-	Short: "Analyze a URL",
-	Args:  cobra.ExactArgs(1),
+	Use:     "analyze [url]",
+	Aliases: []string{"a"},
+	Short:   "Analyze a URL",
+	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Running parser")
+		fmt.Println("Running analyzer")
 		if len(args) > 1 {
 			fmt.Println("Multiple url links included, not supported yet")
 			os.Exit(0)

@@ -34,6 +34,7 @@ type ContentBlock struct {
 	Area        float64
 }
 
+// TODO: Rename
 func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 	// body := da.page.MustElement("body")
 	// elems, err := body.Element("section")
@@ -50,7 +51,7 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 			continue // Skip problematic elements
 		}
 
-		if block.TextLength > 10 { // Only consider blocks with meaningful text
+		if block.TextLength > 15 { // Only consider blocks with meaningful text
 			blocks = append(blocks, block)
 		}
 	}
@@ -62,8 +63,38 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 	maxDensity := 0.0
 	var mainBlock *ContentBlock
 
+	for _, block := range blocks {
+		parent, err := block.Element.Parent()
+		if err == nil {
+			parentID := parent.Object.ObjectID
+			for i, bl := range blocks {
+				blID := bl.Element.Object.ObjectID
+				if blID == parentID {
+					fmt.Println("par")
+					blocks[i].Density += block.Density * 0.5
+				}
+				grandPar, err := parent.Parent()
+				if err != nil {
+					continue
+				}
+				if blID == grandPar.Object.ObjectID {
+					fmt.Println("grand")
+					blocks[i].Density += block.Density * 0.25
+				}
+
+				grandGrandPar, err := grandPar.Parent()
+				if err != nil {
+					continue
+				}
+				if blID == grandGrandPar.Object.ObjectID {
+					fmt.Println("grand grand")
+					blocks[i].Density += block.Density * 0.15
+				}
+			}
+		}
+	}
+
 	for i, block := range blocks {
-		// Boost score for semantic tags
 		score := block.Density
 		if block.TagName == "article" || block.TagName == "main" {
 			score *= 1.5
@@ -90,7 +121,6 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 		if block.TextLength > 5000 {
 			score *= 2
 		}
-
 		if score > maxDensity {
 			maxDensity = score
 			mainBlock = &blocks[i]
@@ -106,14 +136,13 @@ func (da *DensityAnalyzer) AnalyzeContentDensity() (MainArticle, error) {
 		Author:  "",
 	}
 
+	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:20], mainBlock.TextContent[len(mainBlock.TextContent)-20:])
+
 	return art, nil
 }
 
 func (da *DensityAnalyzer) analyzeElement(element *rod.Element) (ContentBlock, error) {
-	textContent, err := element.Text()
-	if err != nil {
-		return ContentBlock{}, err
-	}
+	textContent := element.MustText()
 
 	cleanText := da.cleanText(textContent)
 	cleanLen := len(cleanText)
@@ -121,12 +150,12 @@ func (da *DensityAnalyzer) analyzeElement(element *rod.Element) (ContentBlock, e
 	// TODO: don't penalize links, if their href is a navigator tag
 	// like so <li> <a href="#1" /> </li>
 	links := element.MustElements("a")
-	linkCount := 0
+	linkCount := len(links)
 
-	for _, v := range links {
-		href := v.MustEval(`() => this.href`).String()
-		fmt.Println(href)
-	}
+	// for _, v := range links {
+	// 	href := v.MustEval(`() => this.href`).String()
+	// 	fmt.Println(href)
+	// }
 
 	box := element.MustShape().Box()
 	var area float64
@@ -192,7 +221,7 @@ func (da *DensityAnalyzer) calculateDensity(textLength, linkCount int, area floa
 		}
 	}
 
-	return baseDensity * linkPenalty
+	return baseDensity * linkPenalty * 1000
 }
 
 func Run(link string) error {
