@@ -9,7 +9,7 @@ func (br *Scapper) generalParserAnalyze(link string) error {
 	page := br.browser.MustPage(link)
 	page.MustWaitLoad()
 	densityAnalyzer := analyzer.NewDensityAnalyzer(page)
-	article, err := densityAnalyzer.AnalyzeContentDensity()
+	article, err := densityAnalyzer.ParseContentDensity()
 	if err != nil {
 		return fmt.Errorf("error running content analyzer %w", err)
 	}
