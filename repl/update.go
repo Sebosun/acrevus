@@ -1,8 +1,6 @@
 package repl
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -43,61 +41,5 @@ func (m model) alwaysUpdate(msg tea.Msg) (model, tea.Cmd) {
 		}
 
 	}
-	return m, nil
-}
-
-func (m model) updatePreview(msg tea.Msg) (model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "d":
-			newFile, err := m.deleteArticle()
-			if err != nil {
-				// likely should have some codes for various errors etc
-				m.error = fmt.Sprintf("Error %v", err)
-			}
-			m.articles = newFile
-
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "right", "l":
-			m.selected = m.cursor
-			m.cursor = 0
-			m.isReading = true
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		case "down", "j":
-			if m.cursor < len(m.articles)-1 {
-				m.cursor++
-			}
-		}
-	}
-	return m, nil
-}
-
-func (m model) updateReading(msg tea.Msg) (model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		// Cool, what was the actual key pressed?
-		switch msg.String() {
-
-		case "left", "h":
-			m.cursor = 0
-			m.selected = m.cursor
-			m.isReading = false
-
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		case "down", "j":
-			m.cursor++
-		}
-	}
-
 	return m, nil
 }

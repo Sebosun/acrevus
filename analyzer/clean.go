@@ -1,6 +1,11 @@
 package analyzer
 
-import "github.com/go-rod/rod"
+import (
+	"regexp"
+	"strings"
+
+	"github.com/go-rod/rod"
+)
 
 func (da DensityAnalyzer) clean(element *rod.Element, tag string) {
 	el, err := element.Element(tag)
@@ -29,4 +34,14 @@ func (da DensityAnalyzer) cleanBr(element *rod.Element) error {
 		}
 	}
 	return nil
+}
+
+func cleanClass(text string) string {
+	re := regexp.MustCompile(TextRegex[Class])
+	return re.ReplaceAllString(strings.TrimSpace(text), " ")
+}
+
+func cleanStyle(text string) string {
+	re := regexp.MustCompile(TextRegex[Style])
+	return re.ReplaceAllString(strings.TrimSpace(text), " ")
 }

@@ -100,11 +100,14 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	da.clean(mainBlock.Element, "button")
 	da.cleanBr(mainBlock.Element)
 
+	rawHTML := mainBlock.Element.MustHTML()
+	rawHTML = cleanStyle(cleanClass(rawHTML))
+
 	art := MainArticle{
 		Content: *mainBlock,
 		Title:   title,
 		Author:  "",
-		RawHTML: mainBlock.Element.MustHTML(),
+		RawHTML: rawHTML,
 	}
 
 	file, err := os.Create("./temp.html")

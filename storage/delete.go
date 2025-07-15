@@ -32,7 +32,7 @@ func DeleteData(entry Entry) (FileData, error) {
 }
 
 func deleteArticle(relPath string) error {
-	articlesPath, err := getArticlesPath()
+	articlesPath, err := GetArticlesPath()
 	if err != nil {
 		return fmt.Errorf("delete data get artc error %v", err)
 	}

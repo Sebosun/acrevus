@@ -24,7 +24,7 @@ func EnsureFilesExist() (FileData, error) {
 }
 
 func ensureFileExists() (bool, error) {
-	path, err := getEntriesJSONPath()
+	path, err := GetEntriesJSONPath()
 	if err != nil {
 		return false, err
 	}
@@ -44,7 +44,7 @@ func ensureFileExists() (bool, error) {
 }
 
 func ensureFolderExist() error {
-	articlesPath, err := getArticlesPath()
+	articlesPath, err := GetArticlesPath()
 	if err != nil {
 		return nil
 	}

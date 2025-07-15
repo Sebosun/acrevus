@@ -5,7 +5,7 @@ import (
 	"path"
 )
 
-func getBasePath() (string, error) {
+func GetBasePath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -13,9 +13,9 @@ func getBasePath() (string, error) {
 	return path.Join(homeDir, ".local", "share", PROJECT_NAME), nil
 }
 
-func getEntriesJSONPath() (string, error) {
+func GetEntriesJSONPath() (string, error) {
 	filename := "entries.json"
-	baseDir, err := getBasePath()
+	baseDir, err := GetBasePath()
 	if err != nil {
 		return "", err
 	}
@@ -25,8 +25,8 @@ func getEntriesJSONPath() (string, error) {
 	return saveDir, nil
 }
 
-func getArticlesPath() (string, error) {
-	baseDir, err := getBasePath()
+func GetArticlesPath() (string, error) {
+	baseDir, err := GetBasePath()
 	if err != nil {
 		return "", err
 	}

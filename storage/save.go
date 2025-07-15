@@ -21,7 +21,7 @@ func SaveArticle(filename string, entry Entry, data []string) error {
 }
 
 func saveArticle(filename string, html []string) error {
-	articlesPath, err := getArticlesPath()
+	articlesPath, err := GetArticlesPath()
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func saveArticle(filename string, html []string) error {
 }
 
 func overwrite(data FileData) error {
-	jsonPath, err := getEntriesJSONPath()
+	jsonPath, err := GetEntriesJSONPath()
 	if err != nil {
 		return err
 	}

@@ -19,15 +19,16 @@ type Sizes struct {
 }
 
 type model struct {
-	sizes      Sizes
-	scroll     int      // 0-1000 whatever
-	choices    []string // items on the to-do list
-	cursor     int      // which to-do list item our cursor is pointing at
-	error      string
-	curArticle storage.Entry
-	selected   int // which article is being read
-	articles   []storage.Entry
-	isReading  bool
+	sizes          Sizes
+	scroll         int      // 0-1000 whatever
+	choices        []string // items on the to-do list
+	cursor         int      // which to-do list item our cursor is pointing at
+	error          string
+	curArticle     storage.Entry
+	selected       int // which article is being read
+	articles       []storage.Entry
+	isReading      bool
+	articleRawHtml string
 }
 
 func initialModel(fileData storage.FileData) model {
@@ -38,13 +39,9 @@ func initialModel(fileData storage.FileData) model {
 	}
 
 	return model{
-		// Our to-do list is a grocery list
-		cursor:  0,
-		choices: choices,
-		// A map which indicates which choices are selected. We're using
-		// the  map like a mathematical set. The keys refer to the indexes
-		// of the `choices` slice, above.
-		selected:  0,
+		cursor:    0,       // cursor position
+		selected:  0,       // which article is currently selected
+		choices:   choices, // available articles
 		articles:  fileData.Entries,
 		isReading: false,
 	}

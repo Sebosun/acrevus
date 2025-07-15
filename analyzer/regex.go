@@ -7,6 +7,8 @@ const (
 	Dates
 	Emails
 	Share
+	Class
+	Style
 )
 
 var TextRegex = map[RegexType]string{
@@ -14,5 +16,6 @@ var TextRegex = map[RegexType]string{
 	Dates:     `\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b`,
 	Emails:    `\b\w+@\w+\.\w+\b`,
 	Share:     `/(\b|_)(share|sharedaddy)(\b|_)/i`,
+	Class:     `class="([^"]*)"`,
+	Style:     `style="([^"]*)"`,
 }
-

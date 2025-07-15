@@ -6,7 +6,7 @@ import (
 )
 
 func GetFileData() (FileData, error) {
-	path, err := getEntriesJSONPath()
+	path, err := GetEntriesJSONPath()
 	if err != nil {
 		return FileData{}, err
 	}
