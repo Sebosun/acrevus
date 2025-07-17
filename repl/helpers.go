@@ -15,7 +15,8 @@ func (m model) renderOnlyVisible(rendered string, footer []string) string {
 
 		if isBeforeView && isAfterView {
 			if i == m.cursor {
-				acc = append(acc, ">"+v[1:])
+				curRead := currentlyReadingStyle.Render(v[1:])
+				acc = append(acc, ">"+curRead)
 			} else {
 				acc = append(acc, v)
 			}

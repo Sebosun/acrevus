@@ -26,12 +26,7 @@ func InitFetcher(link string) error {
 	scrapper := NewScrapper(browser)
 	fmt.Println("Host ", url.Host)
 
-	switch url.Host {
-	case "substack.com":
-		scrapper.substackParser(link)
-	default:
-		scrapper.generalParserAnalyze(link)
-	}
+	scrapper.generalParserAnalyze(link)
 
 	return nil
 }
