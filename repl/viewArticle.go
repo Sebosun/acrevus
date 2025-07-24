@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
 
@@ -26,7 +25,7 @@ func (m model) ViewArticle() string {
 	// art := m.articles[m.selected]
 	// s += m.articleRawHtml
 
-	result, err := ViewHTMLArticle(m.articleRawHtml)
+	result, err := getParsedArticles(m.articleRawHtml)
 	if err != nil {
 		return "Error parsing the article"
 	}
@@ -44,7 +43,7 @@ func (m model) ViewArticle() string {
 		Width(int(m.sizes.width/2)).
 		Padding(1, 2)
 	stylized := style.Render(s)
-	visible := m.renderOnlyVisible(stylized, footer)
+	visible := m.centerText(m.renderOnlyVisible(stylized, footer))
 
 	file, err := os.Create("./temp-render.html")
 	if err != nil {
@@ -56,60 +55,54 @@ func (m model) ViewArticle() string {
 	return visible
 }
 
-func ViewHTMLArticle(rawHTML string) (DisplayNode, error) {
-	n, err := html.Parse(strings.NewReader(rawHTML))
-	if err != nil {
-		return DisplayNode{}, err
-	}
-
-	nodes := runTextParser(n, 0)
-
-	return nodes, nil
-}
-
 func getTexts(n DisplayNode) string {
 	s := ""
-	re := regexp.MustCompile(`w+`)
+	re := regexp.MustCompile(`[a-zA-Z0-9]`)
 
-	switch n.ParentNode {
+	child_text := ""
+	for _, child := range n.Children {
+		txt := getTexts(child)
+		child_text += txt
+	}
+
+	text := n.TextContent + child_text
+	switch n.NodeType {
 	case atom.Span:
-		attachString := strings.TrimLeft(n.TextContent, "\t")
-		attachString = strings.TrimLeft(attachString, " ")
-		attachString = strings.TrimLeft(attachString, "\n")
-		hasWords := re.Match([]byte(attachString))
+		attachString := strings.TrimLeft(text, "\t")
+		attachString = strings.TrimLeft(text, " ")
+		attachString = strings.TrimLeft(text, "\n")
+		hasWords := re.Match([]byte(text))
 		if hasWords {
 			s += attachString + " "
 		}
-
 	case atom.P:
-		s += "\n"
-		s += n.TextContent
-		s += "\n"
+		s += text
+		s += "\n \n"
 	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5:
-		s += "\n"
-		s += headerStyle.Render(n.TextContent)
-		s += "\n"
+		s += headerStyle.Render(text)
+		s += "\n \n"
 	case atom.Li:
-		style := lipgloss.NewStyle().
-			Bold(false).
-			Padding(0, 2).
-			Background(lipgloss.Color("#7D56F4")).
-			Foreground(lipgloss.Color("#7D56F4"))
-		s += style.Render(n.TextContent) + " - LI"
+		s += "  - " + strings.TrimLeft(text, "\n \n")
 	default:
-		re := regexp.MustCompile(`[a-zA-Z0-9]`)
-		result := re.Match([]byte(n.TextContent))
+		result := re.Match([]byte(text))
 		if result {
-			s += n.TextContent + " "
+			s += text + " "
 		} else {
-
 		}
 	}
 
-	for _, child := range n.Children {
-		txt := getTexts(child)
-		s += txt
-	}
+	return cleanText(s)
+}
 
-	return s
+func cleanText(input string) string {
+	reNewSpaces := regexp.MustCompile(`\n{3}`)
+	reSpaces := regexp.MustCompile(` {2,}`)
+	reTwoNew := regexp.MustCompile(`\n `)
+
+	stripped := reTwoNew.ReplaceAll([]byte(input), []byte("\n"))
+	stripped = reNewSpaces.ReplaceAll([]byte(stripped), []byte("\n"))
+	stripped = reSpaces.ReplaceAll([]byte(stripped), []byte(" "))
+
+	return string(stripped)
+
 }
