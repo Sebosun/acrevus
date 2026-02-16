@@ -104,5 +104,4 @@ func cleanText(input string) string {
 	stripped = reSpaces.ReplaceAll([]byte(stripped), []byte(" "))
 
 	return string(stripped)
-
 }

@@ -20,6 +20,7 @@ var fetchCmd = &cobra.Command{
 			fmt.Println("Multiple url links included, not supported yet")
 			os.Exit(0)
 		}
+		fmt.Println("Fetch start...")
 		link := args[0]
 		_, err := url.ParseRequestURI(link)
 		if err != nil {
@@ -41,6 +42,7 @@ var fetchCmd = &cobra.Command{
 	},
 }
 
+// For now it's mostly internal for running command out of cli
 var parseURL = &cobra.Command{
 	Use:     "analyze [url]",
 	Aliases: []string{"a"},

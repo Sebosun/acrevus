@@ -1,5 +1,12 @@
 package analyzer
 
+import (
+	"fmt"
+	"time"
+
+	"github.com/go-rod/rod"
+)
+
 func (da *DensityAnalyzer) weighScoreByTag(blocks *[]ContentBlock) {
 	for i, block := range *blocks {
 		score := block.Density
@@ -28,32 +35,61 @@ func (da *DensityAnalyzer) weighScoreByTag(blocks *[]ContentBlock) {
 	}
 }
 
+var fingerprintJS = `() =>
+		this.id + "|"
+		+ this.tagName + '|'
+		+ this.className + '|'
+		+ this.childElementCount + '|'
+		+ this.clientHeight + '|'
+		+ this.clientWidth + '|'
+		+ this.textContent.substring(0, 50)`
+
+func elementFingerprint(el *rod.Element) string {
+	return el.MustEval(fingerprintJS).String()
+}
+
 func (da *DensityAnalyzer) redistributeToParents(blocks *[]ContentBlock) {
+	start := time.Now()
+
+	fpIndex := make(map[string][]int, len(*blocks))
+	for i := range *blocks {
+		bl := &(*blocks)[i]
+		if bl.CachedFingerprintString == "" {
+			bl.CachedFingerprintString = elementFingerprint(bl.Element)
+		}
+		fpIndex[bl.CachedFingerprintString] = append(fpIndex[bl.CachedFingerprintString], i)
+	}
+
+	loopStart := time.Now()
 	for _, block := range *blocks {
 		parent, err := block.Element.Parent()
-		if err == nil {
-			for i, bl := range *blocks {
-				if da.isSameElement(parent, bl.Element) {
-					(*blocks)[i].Density += block.Density * 0.5
-				}
+		if err != nil {
+			continue
+		}
 
-				grandPar, err := parent.Parent()
-				if err != nil {
-					continue
-				}
+		parentFP := elementFingerprint(parent)
+		for _, i := range fpIndex[parentFP] {
+			(*blocks)[i].Density += block.Density * 0.5
+		}
 
-				if da.isSameElement(grandPar, bl.Element) {
-					(*blocks)[i].Density += block.Density * 0.25
-				}
+		grandPar, err := parent.Parent()
+		if err != nil {
+			continue
+		}
+		grandFP := elementFingerprint(grandPar)
+		for _, i := range fpIndex[grandFP] {
+			(*blocks)[i].Density += block.Density * 0.25
+		}
 
-				grandGrandPar, err := grandPar.Parent()
-				if err != nil {
-					continue
-				}
-				if da.isSameElement(grandGrandPar, bl.Element) {
-					(*blocks)[i].Density += block.Density * 0.15
-				}
-			}
+		grandGrandPar, err := grandPar.Parent()
+		if err != nil {
+			continue
+		}
+		grandGrandFP := elementFingerprint(grandGrandPar)
+		for _, i := range fpIndex[grandGrandFP] {
+			(*blocks)[i].Density += block.Density * 0.15
 		}
 	}
+	fmt.Printf("  [timer] parent redistribution loop: %v\n", time.Since(loopStart))
+	fmt.Printf("  [timer] redistributeToParents total: %v\n", time.Since(start))
 }

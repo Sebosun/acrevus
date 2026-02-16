@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-rod/rod"
 )
@@ -27,25 +28,31 @@ type MainArticle struct {
 }
 
 type ContentBlock struct {
-	Element     *rod.Element
-	TextContent string
-	LinkCount   int
-	TextLength  int
-	Density     float64
-	TagName     string
-	Area        float64
+	Element                 *rod.Element
+	TextContent             string
+	LinkCount               int
+	TextLength              int
+	Density                 float64
+	TagName                 string
+	Area                    float64
+	CachedFingerprintString string
 }
 
 func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
+	totalStart := time.Now()
+
 	// body := da.page.MustElement("body")
 	// elems, err := body.Element("section")
+	t := time.Now()
 	elements, err := da.page.Elements("body, div, p, article, section, main, aside, header, footer")
 	if err != nil {
 		return MainArticle{}, err
 	}
+	fmt.Printf("[timer] querying DOM elements (%d found): %v\n", len(elements), time.Since(t))
 
 	var blocks []ContentBlock
 
+	t = time.Now()
 	fmt.Println("Calculating elements...")
 	for _, element := range elements {
 		block, err := da.analyzeElement(element)
@@ -57,6 +64,7 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 			blocks = append(blocks, block)
 		}
 	}
+	fmt.Printf("[timer] analyzing %d elements (%d blocks kept): %v\n", len(elements), len(blocks), time.Since(t))
 
 	if len(blocks) == 0 {
 		return MainArticle{}, fmt.Errorf("no content blocks found")
@@ -65,11 +73,15 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	maxDensity := 0.0
 	var mainBlock *ContentBlock
 
+	t = time.Now()
 	fmt.Println("Weighing score based on elements...")
 	da.weighScoreByTag(&blocks)
+	fmt.Printf("[timer] weighScoreByTag: %v\n", time.Since(t))
 
+	t = time.Now()
 	fmt.Println("Redistributing score based on parentage...")
 	da.redistributeToParents(&blocks)
+	fmt.Printf("[timer] redistributeToParents: %v\n", time.Since(t))
 
 	fmt.Println("Choosing the winner...")
 	for i, block := range blocks {
@@ -80,11 +92,7 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 		}
 	}
 
-	title := da.getTitle()
-	// fmt.Printf("Len %d | Text first 50: %s \t Last 10: %s\n", mainBlock.TextLength, mainBlock.TextContent[:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
-	// fmt.Printf("Tag name %s | Score: %v | Max density %v \n", mainBlock.TagName, mainBlock.Density, maxDensity)
-	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
-
+	t = time.Now()
 	fmt.Println("Running cleanups...")
 	da.clean(mainBlock.Element, "form")
 	da.clean(mainBlock.Element, "fieldset")
@@ -99,7 +107,17 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	da.clean(mainBlock.Element, "select")
 	da.clean(mainBlock.Element, "button")
 	da.cleanBr(mainBlock.Element)
+	fmt.Printf("[timer] cleanups: %v\n", time.Since(t))
 
+	t = time.Now()
+	title := da.getTitle()
+	// fmt.Printf("Len %d | Text first 50: %s \t Last 10: %s\n", mainBlock.TextLength, mainBlock.TextContent[:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
+	// fmt.Printf("Tag name %s | Score: %v | Max density %v \n", mainBlock.TagName, mainBlock.Density, maxDensity)
+	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
+
+	fmt.Printf("[timer] getTitle + print: %v\n", time.Since(t))
+
+	t = time.Now()
 	rawHTML := mainBlock.Element.MustHTML()
 	rawHTML = cleanStyle(cleanClass(rawHTML))
 
@@ -109,6 +127,9 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 		Author:  "",
 		RawHTML: rawHTML,
 	}
+
+	fmt.Printf("[timer] HTML extraction + cleaning: %v\n", time.Since(t))
+	fmt.Printf("[timer] ParseContentDensity total: %v\n", time.Since(totalStart))
 
 	file, err := os.Create("./temp.html")
 	if err != nil {
