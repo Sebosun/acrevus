@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+
 	"sebosun/acrevus-go/storage"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -26,7 +27,7 @@ func (m model) updatePreview(msg tea.Msg) (model, tea.Cmd) {
 		case "right", "l":
 			m.selected = m.cursor
 			m.cursor = 0
-			m.isReading = true
+			m.state = StateReading
 			newM, err := m.getRawArticle()
 			if err == nil {
 				m = newM
@@ -48,18 +49,16 @@ func (m model) updatePreview(msg tea.Msg) (model, tea.Cmd) {
 func (m model) getRawArticle() (model, error) {
 	art := m.articles[m.selected]
 	artPath, err := storage.GetArticlesPath()
-
 	if err != nil {
-		return model{}, fmt.Errorf("Error reading article file %w", err)
+		return model{}, fmt.Errorf("error reading article file %w", err)
 	}
 
 	artPath = path.Join(artPath, art.Path)
-	dir, err := os.ReadFile(artPath)
-
+	article, err := os.ReadFile(artPath)
 	if err != nil {
-		return model{}, fmt.Errorf("Error reading article file %w", err)
+		return model{}, fmt.Errorf("error reading article file %w", err)
 	}
-	m.articleRawHtml = string(dir)
+	m.articleRawHTML = string(article)
 
 	return m, nil
 }

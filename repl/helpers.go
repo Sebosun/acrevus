@@ -2,8 +2,8 @@ package repl
 
 import "strings"
 
-func (m model) renderOnlyVisible(rendered string, footer []string) string {
-	lines := strings.Split(rendered, "\n")
+func (m model) renderOnlyVisible(article string, footer []string) string {
+	lines := strings.Split(article, "\n")
 	footerLines := parseFooter(footer)
 
 	var acc []string
@@ -15,8 +15,9 @@ func (m model) renderOnlyVisible(rendered string, footer []string) string {
 
 		if isBeforeView && isAfterView {
 			if i == m.cursor {
-				curRead := currentlyReadingStyle.Render(v[1:])
-				acc = append(acc, ">"+curRead)
+				// curRead := currentlyReadingStyle.Render(v[1:])
+				// acc = append(acc, ">"+curRead)
+				acc = append(acc, ">"+v)
 			} else {
 				acc = append(acc, v)
 			}
@@ -28,21 +29,28 @@ func (m model) renderOnlyVisible(rendered string, footer []string) string {
 	return strings.Join(acc, "\n")
 }
 
-func (m model) centerText(rendered string) string {
+func (m model) centerText(rendered string, paddingProcent float64) string {
 	lines := strings.Split(rendered, "\n")
 	var acc []string
 
+	linesWidthProcent := (1 - paddingProcent) / 2
+	maxWidth := int(float32(m.sizes.width) * float32(linesWidthProcent))
+
 	for _, v := range lines {
-		innerAcc := ""
-		// m.sizes.width / 2 * 2 - 25% on each side
-		for i := 0; i < m.sizes.width/(2*2); i++ {
-			innerAcc += " "
+		var innerAcc strings.Builder
+		// m.sizes.width / 2 * 2 - 25% of entire thing
+		for range maxWidth {
+			innerAcc.WriteString(" ")
 		}
-		innerAcc += v
-		acc = append(acc, innerAcc)
+		innerAcc.WriteString(v)
+		acc = append(acc, innerAcc.String())
 	}
 
 	return strings.Join(acc, "\n")
+}
+
+func (m *model) updateViewHeight(height int) {
+	m.viewHeight = height
 }
 
 func parseFooter(footer []string) []string {

@@ -8,6 +8,7 @@ package repl
 import (
 	"fmt"
 	"os"
+
 	"sebosun/acrevus-go/storage"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,17 +19,29 @@ type Sizes struct {
 	height int
 }
 
+type State string
+
+const (
+	StateReading State = "reading"
+	StateMain    State = "main"
+)
+
+type DisplayOpts struct {
+	isCentered bool
+	debug      bool
+}
+
 type model struct {
 	sizes          Sizes
-	scroll         int      // 0-1000 whatever
-	choices        []string // items on the to-do list
-	cursor         int      // which to-do list item our cursor is pointing at
+	choices        []string // Items on the article reading list
+	cursor         int      // Which item our cursor is pointing at
 	error          string
-	curArticle     storage.Entry
 	selected       int // which article is being read
 	articles       []storage.Entry
-	isReading      bool
-	articleRawHtml string
+	state          State
+	articleRawHTML string
+	viewHeight     int
+	opts           DisplayOpts
 }
 
 func initialModel(fileData storage.FileData) model {
@@ -39,11 +52,15 @@ func initialModel(fileData storage.FileData) model {
 	}
 
 	return model{
-		cursor:    0,       // cursor position
-		selected:  0,       // which article is currently selected
-		choices:   choices, // available articles
-		articles:  fileData.Entries,
-		isReading: false,
+		cursor:   0,       // cursor position
+		selected: 0,       // which article is currently selected
+		choices:  choices, // available articles
+		articles: fileData.Entries,
+		state:    StateMain,
+		opts: DisplayOpts{
+			isCentered: true,
+			debug:      true,
+		},
 	}
 }
 

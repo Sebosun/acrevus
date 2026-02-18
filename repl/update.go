@@ -10,20 +10,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	if m.isReading {
+	switch m.state {
+	case StateReading:
 		m, cmd = m.updateReading(msg)
 		if cmd != nil {
 			return m, cmd
 		}
-	}
-
-	if !m.isReading {
+	case StateMain:
 		m, cmd = m.updatePreview(msg)
 		if cmd != nil {
 			return m, cmd
 		}
-
 	}
+
 	// Return the updated model to the Bubble Tea runtime for processing.
 	// Note that we're not returning a command.
 	return m, nil
@@ -39,7 +38,6 @@ func (m model) alwaysUpdate(msg tea.Msg) (model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		}
-
 	}
 	return m, nil
 }

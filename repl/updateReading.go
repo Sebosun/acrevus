@@ -5,13 +5,12 @@ import tea "github.com/charmbracelet/bubbletea"
 func (m model) updateReading(msg tea.Msg) (model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Cool, what was the actual key pressed?
 		switch msg.String() {
 
 		case "left", "h":
 			m.cursor = 0
 			m.selected = m.cursor
-			m.isReading = false
+			m.state = StateMain
 
 		case "up", "k":
 			if m.cursor > 0 {
@@ -31,7 +30,6 @@ func (m model) updateReading(msg tea.Msg) (model, tea.Cmd) {
 		case "D":
 			m.cursor += m.sizes.height
 		}
-
 	}
 
 	return m, nil

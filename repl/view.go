@@ -2,9 +2,16 @@ package repl
 
 func (m model) View() string {
 	// The header
-	if m.isReading {
-		return m.ViewArticle()
+	var view string
+
+	switch m.state {
+	case StateReading:
+		view = m.ViewArticle()
+	case StateMain:
+		view = m.PreviewView()
 	}
 
-	return m.PreviewView()
+	m.updateViewHeight(len(view))
+
+	return view
 }
