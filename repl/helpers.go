@@ -10,7 +10,7 @@ func (m model) renderOnlyVisible(article string, footer []string) string {
 	footLen := len(footerLines)
 
 	for i, v := range lines {
-		isBeforeView := i >= m.cursor
+		isBeforeView := i + m.sizes.height >= m.cursor
 		isAfterView := i < m.sizes.height+m.cursor-footLen
 
 		if isBeforeView && isAfterView {
