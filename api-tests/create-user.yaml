@@ -1,0 +1,122 @@
+info:
+  name: Create User
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/users"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "user": "John Doe",
+        "email": "{{createUserEmail}}",
+        "password": "ExamplePass123!"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const suffix = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
+        bru.setVar("createUserEmail", `john.${suffix}@example.com`);
+    - type: tests
+      code: |-
+        test("should return 200", function() {
+          expect(res.status).to.equal(200);
+        });
+
+        test("should return the created user", function() {
+          const user = res.body.user;
+          expect(user.ID).to.be.a("number").and.to.be.above(0);
+          expect(user.Name).to.equal("John Doe");
+          expect(user.Email).to.equal(bru.getVar("createUserEmail"));
+        });
+
+        test("should initialize timestamps and leave the user active", function() {
+          const user = res.body.user;
+          expect(Number.isNaN(Date.parse(user.CreatedAt))).to.equal(false);
+          expect(Number.isNaN(Date.parse(user.UpdatedAt))).to.equal(false);
+          expect(user.DeletedAt.Valid).to.equal(false);
+        });
+
+examples:
+  - name: User created
+    description: Successful response; ID, password hash, and timestamps are illustrative.
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "user": "John Doe",
+            "email": "john@example.com",
+            "password": "ExamplePass123!"
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "user": {
+              "ID": 1,
+              "Name": "John Doe",
+              "Email": "john@example.com",
+              "Password": "<bcrypt hash>",
+              "CreatedAt": "2026-09-14T12:00:00Z",
+              "UpdatedAt": "2026-09-14T12:00:00Z",
+              "DeletedAt": {
+                "Time": "0001-01-01T00:00:00Z",
+                "Valid": false
+              }
+            }
+          }
+  - name: Missing password
+    request:
+      method: POST
+      url: "{{baseUrl}}/users"
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "user": "John Doe",
+            "email": "john@example.com"
+          }
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: Content-Type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "error": "Key: 'UserForm.Password' Error:Field validation for 'Password' failed on the 'required' tag"
+          }
+
+docs: |-
+  Select the local environment to send POST http://localhost:1234/api/v1/users.
+  The name field is sent as "user", matching UserForm's current JSON tag.
+  The before-request script generates a unique email for each run.
+  Saved examples document the current 200 success and 400 validation responses.
+
+settings:
+  encodeUrl: true
