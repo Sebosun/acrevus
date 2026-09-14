@@ -11,5 +11,6 @@ func Execute() {
 	rootCmd.AddCommand(parseURL)
 	rootCmd.AddCommand(fetchCmd)
 	rootCmd.AddCommand(uiCmd)
+	rootCmd.AddCommand(serverCmd)
 	rootCmd.Execute()
 }
