@@ -16,13 +16,13 @@
   Use an isolated HOME when exercising storage destructively.
 - Fetch and analyze use Rod with a live browser and network access.
   Both write `./temp.html` through the analyzer; this file is not gitignored.
-- `go run . server` starts Gin with `GET /ping`. The Bruno collection in
-  `api-tests/` uses the `local` environment at `http://localhost:8080`;
-  `get-posts.bru` actually calls `/ping` and only logs the response.
+- User routes are registered under `/api/v1` via `ApiConfig.registerUserRoutes`.
+  `PATCH /users/:id` preserves omitted fields atomically in SQL; DELETE is soft.
+  Public responses use `UserResponse`, not the generated model (which has a hash).
 
 ## Database workflow
 - See `README.md` for environment variables and tool installation. Compose,
-  Goose, and the server load root `.env`; the server requires `DB_URL` and `PORT`.
+  Goose, and the server load root `.env`; the server requires `DATABASE_URL` and `PORT`.
 - sqlc targets `database/sql`; use `*sql.DB` with the `lib/pq` driver and
   `sql.Open("postgres", ...)`. Generated transactions use `*sql.Tx`.
 - Start Postgres with `docker compose up -d --wait postgres`, then `goose up`.
@@ -34,9 +34,11 @@
   writes must maintain it too. `password` stores a hash supplied by the caller.
 
 ## Verification
-- There are currently no Go test files or repository-specific check scripts.
-  Use `go build ./...` and `go test ./...` for baseline checks;
-  `go test ./storage` scopes verification to storage.
+- Use `go build ./...` and `go test ./...` for baseline checks;
+  `go test ./server` runs user input-validation tests without Postgres.
+- `TestUserLifecycle` requires `TEST_DATABASE_URL` pointing to a migrated Postgres
+  database. It uses a session-local temporary copy of `public.users`; keep its
+  connection pool limited to one connection so every query sees the same table.
 - `cmd/fetch.go` currently contains an invalid `%i` printf verb, which can
   cause the vet phase of `go test ./...` to fail.
 - For database changes, also run `goose validate` and `sqlc vet`; exercise Goose

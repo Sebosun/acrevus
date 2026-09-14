@@ -11,10 +11,19 @@ WHERE id = $1 AND deleted_at IS NULL;
 SELECT * FROM users
 WHERE email = $1 AND deleted_at IS NULL;
 
+-- name: ListUsers :many
+SELECT * FROM users
+WHERE deleted_at IS NULL
+ORDER BY id
+LIMIT $1 OFFSET $2;
+
 -- name: UpdateUser :one
 UPDATE users
-SET name = $2, email = $3, password = $4, updated_at = NOW()
-WHERE id = $1 AND deleted_at IS NULL
+SET name = COALESCE(sqlc.narg('name'), name),
+    email = COALESCE(sqlc.narg('email'), email),
+    password = COALESCE(sqlc.narg('password'), password),
+    updated_at = NOW()
+WHERE id = sqlc.arg('id') AND deleted_at IS NULL
 RETURNING *;
 
 -- name: SoftDeleteUser :execrows

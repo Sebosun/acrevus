@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -76,6 +77,49 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
+const listUsers = `-- name: ListUsers :many
+SELECT id, name, email, password, created_at, updated_at, deleted_at FROM users
+WHERE deleted_at IS NULL
+ORDER BY id
+LIMIT $1 OFFSET $2
+`
+
+type ListUsersParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, listUsers, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Email,
+			&i.Password,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const softDeleteUser = `-- name: SoftDeleteUser :execrows
 UPDATE users
 SET deleted_at = NOW(), updated_at = NOW()
@@ -92,24 +136,27 @@ func (q *Queries) SoftDeleteUser(ctx context.Context, id int64) (int64, error) {
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET name = $2, email = $3, password = $4, updated_at = NOW()
-WHERE id = $1 AND deleted_at IS NULL
+SET name = COALESCE($1, name),
+    email = COALESCE($2, email),
+    password = COALESCE($3, password),
+    updated_at = NOW()
+WHERE id = $4 AND deleted_at IS NULL
 RETURNING id, name, email, password, created_at, updated_at, deleted_at
 `
 
 type UpdateUserParams struct {
+	Name     sql.NullString
+	Email    sql.NullString
+	Password sql.NullString
 	ID       int64
-	Name     string
-	Email    string
-	Password string
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, updateUser,
-		arg.ID,
 		arg.Name,
 		arg.Email,
 		arg.Password,
+		arg.ID,
 	)
 	var i User
 	err := row.Scan(

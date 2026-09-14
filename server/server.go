@@ -48,7 +48,7 @@ func StartServer() {
 
 	api := router.Group("/api/v1")
 
-	api.POST("/users", apiConfig.UserCreate)
+	apiConfig.registerUserRoutes(api)
 
 	// Start server on port 8080 (default)
 	// Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)

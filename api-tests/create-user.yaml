@@ -13,7 +13,7 @@ http:
     type: json
     data: |-
       {
-        "user": "John Doe",
+        "name": "John Doe",
         "email": "{{createUserEmail}}",
         "password": "ExamplePass123!"
       }
@@ -33,21 +33,23 @@ runtime:
 
         test("should return the created user", function() {
           const user = res.body.user;
-          expect(user.ID).to.be.a("number").and.to.be.above(0);
-          expect(user.Name).to.equal("John Doe");
-          expect(user.Email).to.equal(bru.getVar("createUserEmail"));
+          expect(user.id).to.be.a("number").and.to.be.above(0);
+          expect(user.name).to.equal("John Doe");
+          expect(user.email).to.equal(bru.getVar("createUserEmail"));
+          expect(user).not.to.have.property("password");
+          expect(user).not.to.have.property("Password");
         });
 
         test("should initialize timestamps and leave the user active", function() {
           const user = res.body.user;
-          expect(Number.isNaN(Date.parse(user.CreatedAt))).to.equal(false);
-          expect(Number.isNaN(Date.parse(user.UpdatedAt))).to.equal(false);
-          expect(user.DeletedAt.Valid).to.equal(false);
+          expect(Number.isNaN(Date.parse(user.created_at))).to.equal(false);
+          expect(Number.isNaN(Date.parse(user.updated_at))).to.equal(false);
+          expect(user.deleted_at).to.equal(null);
         });
 
 examples:
   - name: User created
-    description: Successful response; ID, password hash, and timestamps are illustrative.
+    description: Successful response; ID and timestamps are illustrative.
     request:
       method: POST
       url: "{{baseUrl}}/users"
@@ -58,7 +60,7 @@ examples:
         type: json
         data: |-
           {
-            "user": "John Doe",
+            "name": "John Doe",
             "email": "john@example.com",
             "password": "ExamplePass123!"
           }
@@ -73,16 +75,12 @@ examples:
         data: |-
           {
             "user": {
-              "ID": 1,
-              "Name": "John Doe",
-              "Email": "john@example.com",
-              "Password": "<bcrypt hash>",
-              "CreatedAt": "2026-09-14T12:00:00Z",
-              "UpdatedAt": "2026-09-14T12:00:00Z",
-              "DeletedAt": {
-                "Time": "0001-01-01T00:00:00Z",
-                "Valid": false
-              }
+              "id": 1,
+              "name": "John Doe",
+              "email": "john@example.com",
+              "created_at": "2026-09-14T12:00:00Z",
+              "updated_at": "2026-09-14T12:00:00Z",
+              "deleted_at": null
             }
           }
   - name: Missing password
@@ -96,7 +94,7 @@ examples:
         type: json
         data: |-
           {
-            "user": "John Doe",
+            "name": "John Doe",
             "email": "john@example.com"
           }
     response:
@@ -109,12 +107,12 @@ examples:
         type: json
         data: |-
           {
-            "error": "Key: 'UserForm.Password' Error:Field validation for 'Password' failed on the 'required' tag"
+            "error": "name, a valid email, and password are required"
           }
 
 docs: |-
   Select the local environment to send POST http://localhost:1234/api/v1/users.
-  The name field is sent as "user", matching UserForm's current JSON tag.
+  Send "name", "email", and "password". Responses omit the password hash.
   The before-request script generates a unique email for each run.
   Saved examples document the current 200 success and 400 validation responses.
 

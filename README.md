@@ -43,11 +43,10 @@ after Postgres is healthy.
 
 `.env.example` is the tracked template; `.env` and other `.env.*` files are ignored.
 Docker Compose and Goose automatically read `.env` from the working directory.
-The server also loads `.env`; its current configuration requires `DB_URL` and
-`PORT`. When using the template, add these below `DATABASE_URL` in your `.env`:
+The server also loads `.env`; its configuration requires `DATABASE_URL` and
+`PORT`. When using the template, add the server port to your `.env`:
 
 ```dotenv
-DB_URL=${DATABASE_URL}
 PORT=8080
 ```
 
@@ -109,12 +108,62 @@ The initial migration creates `users` with:
 | `updated_at` | Required `TIMESTAMPTZ`, defaults to `NOW()` |
 | `deleted_at` | Nullable `TIMESTAMPTZ`; `NULL` means active |
 
-Generated queries include `CreateUser`, `GetUser`, `GetUserByEmail`, `UpdateUser`,
-and `SoftDeleteUser`. Reads and updates exclude soft-deleted users. Update and
+Generated queries include `CreateUser`, `GetUser`, `GetUserByEmail`, `ListUsers`,
+`UpdateUser`, and `SoftDeleteUser`. Reads and updates exclude soft-deleted users. Update and
 soft-delete queries set `updated_at`; direct SQL writers must also maintain it.
-Hash passwords before passing them to create/update queries. The current
-`POST /users` handler validates input and returns a placeholder response; it does
-not yet insert users.
+Hash passwords before passing them to create/update queries. The HTTP handlers
+hash passwords automatically.
+
+### User API
+
+Start the server with `go run . server`. All user routes use `/api/v1`:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| `POST` | `/api/v1/users` | Create from required `name`, `email`, and `password`; returns 200 |
+| `GET` | `/api/v1/users?limit=20&offset=0` | List active users in ID order; returns 200 |
+| `GET` | `/api/v1/users/:id` | Get an active user; returns 200 |
+| `PATCH` | `/api/v1/users/:id` | Update any of `name`, `email`, or `password`; returns 200 |
+| `DELETE` | `/api/v1/users/:id` | Soft-delete the user; returns 204 with no body |
+
+IDs must be positive integers. List pagination defaults to `limit=20`,
+`offset=0`; the maximum limit is 100. `PATCH` requires at least one non-null field;
+omitted fields are preserved, and supplied fields must be non-empty. Email values
+must be valid email addresses. Passwords must be at most 72 bytes for bcrypt.
+
+Create/get/update return `{"user": {...}}`; lists return
+`{"users": [...], "limit": 20, "offset": 0}` (an empty list is `[]`). User responses
+contain `id`, `name`, `email`, `created_at`, `updated_at`, and `deleted_at` (`null`
+for active users), with no password/hash field. Errors use `{"error": "..."}`:
+400 for invalid input, 404 for missing/deleted users, 409 for duplicate email,
+and 500 for internal failures.
+
+For example, updating a name does not require resubmitting the email or password:
+
+```sh
+curl -X PATCH http://localhost:8080/api/v1/users/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Updated Name"}'
+curl -X DELETE http://localhost:8080/api/v1/users/1
+```
+
+Substitute your configured `PORT`. The Bruno create request in
+`api-tests/create-user.yaml` uses its environment's `baseUrl`.
+
+### User handler tests
+
+`go test ./server` runs input-validation tests without Postgres. To also run the
+full create/list/get/update/delete lifecycle, set `TEST_DATABASE_URL` to a migrated
+Postgres database and run:
+
+```sh
+TEST_DATABASE_URL='postgres://acrevus:acrevus_dev@localhost:5432/acrevus?sslmode=disable' \
+  go test ./server -run TestUserLifecycle -v
+```
+
+The lifecycle test copies `public.users` into a connection-local temporary table,
+exercises the real generated queries, and drops the temporary data when its
+connection closes. Without `TEST_DATABASE_URL`, this test is skipped.
 
 ### Stopping and checking
 
