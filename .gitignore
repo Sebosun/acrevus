@@ -1,3 +1,6 @@
 *.png
 temp-render.html
 acrevus-go
+.env
+.env.*
+!.env.example

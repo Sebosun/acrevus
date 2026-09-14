@@ -2,24 +2,55 @@
 package server
 
 import (
-	"net/http"
+	"database/sql"
+	"log"
 
+	"sebosun/acrevus-go/internal/database"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func StartServer() {
-  // Create a Gin router with default middleware (logger and recovery)
-  r := gin.Default()
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
-  // Define a simple GET endpoint
-  r.GET("/ping", func(c *gin.Context) {
-    // Return JSON response
-    c.JSON(http.StatusOK, gin.H{
-      "message": "pong",
-    })
-  })
+	// Create a Gin router with default middleware (logger and recovery)
+	router := gin.Default()
 
-  // Start server on port 8080 (default)
-  // Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)
-  r.Run()
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowAllOrigins = true
+	corsConfig.AddAllowHeaders("Authorization")
+
+	router.Use(cors.New(corsConfig))
+
+	envs := ReadEnvs()
+
+	db, err := sql.Open("postgres", envs.DB_URL)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	defer db.Close()
+
+	dbQueries := database.New(db)
+
+	apiConfig := ApiConfig{
+		DB:   dbQueries,
+		ENVS: envs,
+	}
+
+	api := router.Group("/api/v1")
+
+	api.POST("/users", apiConfig.UserCreate)
+
+	// Start server on port 8080 (default)
+	// Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)
+	router.Run()
 }
