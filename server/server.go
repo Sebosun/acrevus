@@ -31,7 +31,7 @@ func StartServer() {
 
 	envs := ReadEnvs()
 
-	db, err := sql.Open("postgres", envs.DB_URL)
+	db, err := sql.Open("postgres", envs.DBURL)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -41,14 +41,20 @@ func StartServer() {
 
 	dbQueries := database.New(db)
 
-	apiConfig := ApiConfig{
+	apiConfig := APIConfig{
 		DB:   dbQueries,
 		ENVS: envs,
 	}
 
-	api := router.Group("/api/v1")
+	apiRoute := router.Group("/api/v1")
 
-	apiConfig.registerUserRoutes(api)
+	apiRoute.POST("/users", apiConfig.UserCreate)
+	apiRoute.GET("/users", apiConfig.UserList)
+	apiRoute.GET("/users/:id", apiConfig.UserGet)
+	apiRoute.PATCH("/users/:id", apiConfig.UserUpdate)
+	apiRoute.DELETE("/users/:id", apiConfig.UserDelete)
+
+	apiRoute.POST("/login", apiConfig.UserLogin)
 
 	// Start server on port 8080 (default)
 	// Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)

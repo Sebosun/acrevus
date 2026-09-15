@@ -9,11 +9,11 @@ import (
 
 type Envs struct {
 	PORT   string
-	DB_URL string
-	JWT_SECRET string
+	DBURL string
+	JwtSecret string
 }
 
-type ApiConfig struct {
+type APIConfig struct {
 	DB *database.Queries
 	ENVS Envs
 }
@@ -21,20 +21,20 @@ type ApiConfig struct {
 func ReadEnvs() Envs {
 	envs := Envs{
 		PORT:   os.Getenv("PORT"),
-		DB_URL: os.Getenv("DATABASE_URL"),
-		JWT_SECRET: os.Getenv("SECRET"),
+		DBURL: os.Getenv("DATABASE_URL"),
+		JwtSecret: os.Getenv("JWT_SECRET"),
 	}
 
 	if envs.PORT == "" {
 		log.Fatal("PORT environment variable is not set")
 	}
 
-	if envs.DB_URL == "" {
+	if envs.DBURL == "" {
 		log.Fatal("DATABASE_URL environment variable is not set")
 	}
 
-	if envs.JWT_SECRET == "" {
-		log.Fatal("DATABASE_URL environment variable is not set")
+	if envs.JwtSecret == "" {
+		log.Fatal("JWT Secret nvironment variable is not set")
 	}
 
 	return envs

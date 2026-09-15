@@ -1,4 +1,4 @@
-package server
+package helpers
 
 import (
 	"strings"
@@ -11,10 +11,12 @@ func TestArgon2PasswordHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	second, err := HashPassword(password)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if first == second {
 		t.Fatal("identical passwords must use unique salts")
 	}

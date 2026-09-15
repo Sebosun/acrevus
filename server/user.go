@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"sebosun/acrevus-go/helpers"
 	"sebosun/acrevus-go/internal/database"
-
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 )
@@ -47,15 +47,7 @@ func userResponse(user database.User) UserResponse {
 	return response
 }
 
-func (config *ApiConfig) registerUserRoutes(router *gin.RouterGroup) {
-	router.POST("/users", config.UserCreate)
-	router.GET("/users", config.UserList)
-	router.GET("/users/:id", config.UserGet)
-	router.PATCH("/users/:id", config.UserUpdate)
-	router.DELETE("/users/:id", config.UserDelete)
-}
-
-func (config *ApiConfig) UserCreate(c *gin.Context) {
+func (config *APIConfig) UserCreate(c *gin.Context) {
 	var userForm UserForm
 
 	err := c.ShouldBindJSON(&userForm)
@@ -64,7 +56,7 @@ func (config *ApiConfig) UserCreate(c *gin.Context) {
 		return
 	}
 
-	hashedPassword, err := HashPassword(userForm.Password)
+	hashedPassword, err := helpers.HashPassword(userForm.Password)
 	if err != nil {
 		userError(c, err)
 		return
@@ -86,7 +78,7 @@ func (config *ApiConfig) UserCreate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": userResponse(user)})
 }
 
-func (config *ApiConfig) UserGet(c *gin.Context) {
+func (config *APIConfig) UserGet(c *gin.Context) {
 	id, ok := GetUserID(c)
 
 	if !ok {
@@ -101,7 +93,7 @@ func (config *ApiConfig) UserGet(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": userResponse(user)})
 }
 
-func (config *ApiConfig) UserList(c *gin.Context) {
+func (config *APIConfig) UserList(c *gin.Context) {
 	limit, err := strconv.ParseInt(c.DefaultQuery("limit", "20"), 10, 32)
 	if err != nil || limit < 1 || limit > 100 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be between 1 and 100"})
@@ -127,7 +119,7 @@ func (config *ApiConfig) UserList(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"users": response, "limit": limit, "offset": offset})
 }
 
-func (config *ApiConfig) UserUpdate(c *gin.Context) {
+func (config *APIConfig) UserUpdate(c *gin.Context) {
 	id, ok := GetUserID(c)
 	if !ok {
 		return
@@ -149,7 +141,7 @@ func (config *ApiConfig) UserUpdate(c *gin.Context) {
 		params.Email = sql.NullString{String: *form.Email, Valid: true}
 	}
 	if form.Password != nil {
-		hash, err := HashPassword(*form.Password)
+		hash, err := helpers.HashPassword(*form.Password)
 		if err != nil {
 			userError(c, err)
 			return
@@ -164,7 +156,7 @@ func (config *ApiConfig) UserUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": userResponse(user)})
 }
 
-func (config *ApiConfig) UserDelete(c *gin.Context) {
+func (config *APIConfig) UserDelete(c *gin.Context) {
 	id, ok := GetUserID(c)
 	if !ok {
 		return
@@ -197,8 +189,8 @@ func userError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-	case errors.Is(err, ErrPasswordTooLong):
-		c.JSON(http.StatusBadRequest, gin.H{"error": ErrPasswordTooLong.Error()})
+	case errors.Is(err, helpers.ErrPasswordTooLong):
+		c.JSON(http.StatusBadRequest, gin.H{"error": helpers.ErrPasswordTooLong.Error()})
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		c.JSON(http.StatusConflict, gin.H{"error": "Email is already in use"})
 	default:
