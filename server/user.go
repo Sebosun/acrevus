@@ -14,12 +14,6 @@ import (
 	"github.com/lib/pq"
 )
 
-type UserForm struct {
-	Name     string `json:"name" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-}
-
 type UserUpdateForm struct {
 	Name     *string `json:"name" binding:"omitempty,min=1"`
 	Email    *string `json:"email" binding:"omitempty,email"`
@@ -47,36 +41,6 @@ func userResponse(user database.User) UserResponse {
 	return response
 }
 
-func (config *APIConfig) UserCreate(c *gin.Context) {
-	var userForm UserForm
-
-	err := c.ShouldBindJSON(&userForm)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name, a valid email, and password are required"})
-		return
-	}
-
-	hashedPassword, err := helpers.HashPassword(userForm.Password)
-	if err != nil {
-		userError(c, err)
-		return
-	}
-
-	userParams := database.CreateUserParams{
-		Name:     userForm.Name,
-		Email:    userForm.Email,
-		Password: hashedPassword,
-	}
-
-	user, err := config.DB.CreateUser(c.Request.Context(), userParams)
-
-	if err != nil {
-		userError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"user": userResponse(user)})
-}
 
 func (config *APIConfig) UserGet(c *gin.Context) {
 	id, ok := GetUserID(c)

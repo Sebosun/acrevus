@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"sebosun/acrevus-go/helpers"
+	"sebosun/acrevus-go/internal/database"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,6 +14,13 @@ type UserLoginForm struct {
 	Email    *string `json:"email" binding:"omitempty,email"`
 	Password *string `json:"password" binding:"omitempty,min=1"`
 }
+
+type UserRegistrationForm struct {
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+}
+
 
 func (config *APIConfig) UserLogin(c *gin.Context) {
 	var userForm UserLoginForm
@@ -46,4 +54,34 @@ func (config *APIConfig) UserLogin(c *gin.Context) {
 		"user":  userResponse(user),
 		"token": signedJWT,
 	})
+}
+
+func (config *APIConfig) UserRegister(c *gin.Context) {
+	var userForm UserRegistrationForm
+
+	err := c.ShouldBindJSON(&userForm)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name, a valid email, and password are required"})
+		return
+	}
+
+	hashedPassword, err := helpers.HashPassword(userForm.Password)
+	if err != nil {
+		userError(c, err)
+		return
+	}
+
+	userParams := database.CreateUserParams{
+		Name:     userForm.Name,
+		Email:    userForm.Email,
+		Password: hashedPassword,
+	}
+
+	user, err := config.DB.CreateUser(c.Request.Context(), userParams)
+	if err != nil {
+		userError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"user": userResponse(user)})
 }

@@ -48,13 +48,13 @@ func StartServer() {
 
 	apiRoute := router.Group("/api/v1")
 
-	apiRoute.POST("/users", apiConfig.UserCreate)
 	apiRoute.GET("/users", apiConfig.UserList)
 	apiRoute.GET("/users/:id", apiConfig.UserGet)
 	apiRoute.PATCH("/users/:id", apiConfig.UserUpdate)
 	apiRoute.DELETE("/users/:id", apiConfig.UserDelete)
 
 	apiRoute.POST("/login", apiConfig.UserLogin)
+	apiRoute.POST("/register", apiConfig.UserRegister)
 
 	// Start server on port 8080 (default)
 	// Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)
