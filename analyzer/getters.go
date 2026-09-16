@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// TODO: Add getTitle tests for missing OG metadata/content, missing <title>, and heading fallbacks.
 // Loose adapatation from mozilla/readibility
 func (da *DensityAnalyzer) getTitle() string {
 	// Easy way first
