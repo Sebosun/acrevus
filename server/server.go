@@ -48,13 +48,18 @@ func StartServer() {
 
 	apiRoute := router.Group("/api/v1")
 
+	apiRoute.POST("/login", apiConfig.UserLogin)
+	apiRoute.POST("/register", apiConfig.UserRegister)
+
 	apiRoute.GET("/users", apiConfig.UserList)
 	apiRoute.GET("/users/:id", apiConfig.UserGet)
 	apiRoute.PATCH("/users/:id", apiConfig.UserUpdate)
 	apiRoute.DELETE("/users/:id", apiConfig.UserDelete)
 
-	apiRoute.POST("/login", apiConfig.UserLogin)
-	apiRoute.POST("/register", apiConfig.UserRegister)
+	authorizedRoutes := router.Group("")
+	authorizedRoutes.Use(apiConfig.AuthRequired())
+
+	authorizedRoutes.GET("/me", apiConfig.FetchMe)
 
 	apiRoute.POST("/article", apiConfig.FetchArticle)
 

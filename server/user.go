@@ -10,6 +10,7 @@ import (
 
 	"sebosun/acrevus-go/helpers"
 	"sebosun/acrevus-go/internal/database"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 )
@@ -41,6 +42,20 @@ func userResponse(user database.User) UserResponse {
 	return response
 }
 
+func (config *APIConfig) FetchMe(c *gin.Context) {
+	userID, ok := GetUserIDFromContext(c)
+
+	if !ok {
+		return
+	}
+
+	user, err := config.DB.GetUser(c.Request.Context(), userID)
+	if err != nil {
+		userError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": userResponse(user)})
+}
 
 func (config *APIConfig) UserGet(c *gin.Context) {
 	id, ok := GetUserID(c)
@@ -135,6 +150,17 @@ func (config *APIConfig) UserDelete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func GetUserIDFromContext(c *gin.Context) (int64, bool) {
+	id, err := strconv.ParseInt(c.Param("userID"), 10, 64)
+
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Something wrong with authorization"})
+		return 0, false
+	}
+
+	return id, true
 }
 
 func GetUserID(c *gin.Context) (int64, bool) {
