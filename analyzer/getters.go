@@ -57,9 +57,9 @@ func (da *DensityAnalyzer) getTitle() string {
 			}
 
 			if !match {
-				last := strings.LastIndex(origTitle, ":")
+				separatorIndex := strings.LastIndex(origTitle, ":")
 				// this won't break since we're already checking if : is within title string
-				title = title[:last+1]
+				title = title[:separatorIndex+1]
 
 				isTooShort := len(strings.TrimSpace(title)) < 3
 				if isTooShort {
@@ -72,13 +72,14 @@ func (da *DensityAnalyzer) getTitle() string {
 		el, err := da.page.Elements("h1")
 		// There technically should only be one h1 on the page, if we go by standards
 		if err == nil && len(el) == 1 {
-			if text, err := el[0].Text(); err == nil {
+			text, err := el[0].Text()
+			if err == nil {
 				title = text
 			}
 		}
 	}
 
-	// whitespaces
+	// cleanup
 	re := regexp.MustCompile(`\s{2,}`)
 	title = re.ReplaceAllString(strings.TrimSpace(title), " ")
 
