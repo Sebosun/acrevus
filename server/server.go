@@ -56,6 +56,8 @@ func StartServer() {
 	apiRoute.POST("/login", apiConfig.UserLogin)
 	apiRoute.POST("/register", apiConfig.UserRegister)
 
+	apiRoute.POST("/article", apiConfig.FetchArticle)
+
 	// Start server on port 8080 (default)
 	// Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)
 	router.Run()

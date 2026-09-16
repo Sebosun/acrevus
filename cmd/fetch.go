@@ -61,7 +61,7 @@ var parseURL = &cobra.Command{
 			os.Exit(1)
 		}
 
-		err = analyzer.Run(link)
+		_, err = analyzer.Run(link)
 		if err != nil {
 			fmt.Println("Error running analyzer")
 			os.Exit(1)

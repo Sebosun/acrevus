@@ -12,6 +12,8 @@ import (
 	"github.com/go-rod/rod"
 )
 
+const pageLoadTimeout = 30 * time.Second
+
 type DensityAnalyzer struct {
 	page *rod.Page
 }
@@ -39,21 +41,13 @@ type ContentBlock struct {
 }
 
 func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
-	totalStart := time.Now()
-
-	// body := da.page.MustElement("body")
-	// elems, err := body.Element("section")
-	t := time.Now()
 	elements, err := da.page.Elements("body, div, p, article, section, main, aside, header, footer")
 	if err != nil {
 		return MainArticle{}, err
 	}
-	fmt.Printf("[timer] querying DOM elements (%d found): %v\n", len(elements), time.Since(t))
 
 	var blocks []ContentBlock
 
-	t = time.Now()
-	fmt.Println("Calculating elements...")
 	for _, element := range elements {
 		block, err := da.analyzeElement(element)
 		if err != nil {
@@ -64,7 +58,6 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 			blocks = append(blocks, block)
 		}
 	}
-	fmt.Printf("[timer] analyzing %d elements (%d blocks kept): %v\n", len(elements), len(blocks), time.Since(t))
 
 	if len(blocks) == 0 {
 		return MainArticle{}, fmt.Errorf("no content blocks found")
@@ -73,17 +66,9 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	maxDensity := 0.0
 	var mainBlock *ContentBlock
 
-	t = time.Now()
-	fmt.Println("Weighing score based on elements...")
 	da.weighScoreByTag(&blocks)
-	fmt.Printf("[timer] weighScoreByTag: %v\n", time.Since(t))
-
-	t = time.Now()
-	fmt.Println("Redistributing score based on parentage...")
 	da.redistributeToParents(&blocks)
-	fmt.Printf("[timer] redistributeToParents: %v\n", time.Since(t))
 
-	fmt.Println("Choosing the winner...")
 	for i, block := range blocks {
 		score := block.Density
 		if score > maxDensity {
@@ -92,8 +77,7 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 		}
 	}
 
-	t = time.Now()
-	fmt.Println("Running cleanups...")
+	// TODO: extract to separate function
 	da.clean(mainBlock.Element, "form")
 	da.clean(mainBlock.Element, "fieldset")
 	da.clean(mainBlock.Element, "object")
@@ -107,17 +91,9 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	da.clean(mainBlock.Element, "select")
 	da.clean(mainBlock.Element, "button")
 	da.cleanBr(mainBlock.Element)
-	fmt.Printf("[timer] cleanups: %v\n", time.Since(t))
 
-	t = time.Now()
 	title := da.getTitle()
-	// fmt.Printf("Len %d | Text first 50: %s \t Last 10: %s\n", mainBlock.TextLength, mainBlock.TextContent[:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
-	// fmt.Printf("Tag name %s | Score: %v | Max density %v \n", mainBlock.TagName, mainBlock.Density, maxDensity)
-	fmt.Println(mainBlock.TagName, mainBlock.Density, mainBlock.TextContent[0:50], mainBlock.TextContent[len(mainBlock.TextContent)-50:])
 
-	fmt.Printf("[timer] getTitle + print: %v\n", time.Since(t))
-
-	t = time.Now()
 	rawHTML := mainBlock.Element.MustHTML()
 	rawHTML = cleanStyle(cleanClass(rawHTML))
 
@@ -127,16 +103,6 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 		Author:  "",
 		RawHTML: rawHTML,
 	}
-
-	fmt.Printf("[timer] HTML extraction + cleaning: %v\n", time.Since(t))
-	fmt.Printf("[timer] ParseContentDensity total: %v\n", time.Since(totalStart))
-
-	file, err := os.Create("./temp.html")
-	if err != nil {
-		return art, err
-	}
-	defer file.Close()
-	file.Write([]byte(art.RawHTML))
 
 	return art, nil
 }
@@ -249,17 +215,32 @@ func (da *DensityAnalyzer) isSameElement(el1, el2 *rod.Element) bool {
 	return prop1 == prop2
 }
 
-func Run(link string) error {
+func SaveTempToDrive(art MainArticle) error {
+	file, err := os.Create("./temp.html")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	file.Write([]byte(art.RawHTML))
+
+	return nil
+}
+
+func Run(link string) (MainArticle, error) {
 	browser := rod.New().NoDefaultDevice().MustConnect()
 	defer browser.MustClose()
 
 	page := browser.MustPage(link)
-	page.MustWaitLoad()
+	if err := page.Timeout(pageLoadTimeout).WaitLoad(); err != nil {
+		return MainArticle{}, fmt.Errorf("wait for page load: %w", err)
+	}
 
 	analyzer := NewDensityAnalyzer(page)
-	_, err := analyzer.ParseContentDensity()
+	art, err := analyzer.ParseContentDensity()
+	fmt.Println("We got out, not we need to get back...")
 	if err != nil {
-		return fmt.Errorf("error running content analyzer %w", err)
+		return MainArticle{}, fmt.Errorf("error running content analyzer %w", err)
 	}
-	return nil
+
+	return art, nil
 }
