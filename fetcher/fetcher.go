@@ -17,14 +17,13 @@ func NewScrapper(browser *rod.Browser) *Scapper {
 }
 
 func InitFetcher(link string) error {
-	url, err := url.ParseRequestURI(link)
+	_, err := url.ParseRequestURI(link)
 	if err != nil {
 		return fmt.Errorf("error parsing link%w", err)
 	}
 
 	browser := rod.New().NoDefaultDevice().MustConnect()
 	scrapper := NewScrapper(browser)
-	fmt.Println("Host ", url.Host)
 
 	scrapper.generalParserAnalyze(link)
 
