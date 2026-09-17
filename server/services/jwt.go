@@ -12,12 +12,12 @@ type JwtService struct {
 }
 
 type Claims struct {
-	UserID string `json:"user_id"`
+	UserID int `json:"user_id"`
 
 	jwt.RegisteredClaims
 }
 
-func (jwtService *JwtService) VerifyJWT(tokenString string) (Claims, error) {
+func (jwtService *JwtService) VerifyJWT(tokenString string) (*Claims, error) {
 	claims := &Claims{}
 
 	token, err := jwt.ParseWithClaims(
@@ -30,11 +30,11 @@ func (jwtService *JwtService) VerifyJWT(tokenString string) (Claims, error) {
 	)
 
 	if err != nil {
-		return Claims{}, err
+		return &Claims{}, err
 	}
 
 	if !token.Valid {
-		return Claims{}, errors.New("invalid token")
+		return &Claims{}, errors.New("invalid token")
 	}
 
 	return claims, nil

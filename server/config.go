@@ -22,6 +22,7 @@ type APIConfig struct {
 
 type Services struct {
 	jwt services.JwtService
+	articles services.ArticleService
 }
 
 func ReadEnvs() Envs {

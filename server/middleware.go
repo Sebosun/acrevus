@@ -7,6 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const KeysUserID = "userID"
+
 func (config *APIConfig) AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -36,7 +38,7 @@ func (config *APIConfig) AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		c.Set("userID", claims.UserID)
+		c.Set(KeysUserID, claims.UserID)
 
 		c.Next()
 	}

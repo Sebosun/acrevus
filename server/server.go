@@ -14,6 +14,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// TODO: Some service for sending back errors
+
 func StartServer() {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -49,16 +51,16 @@ func StartServer() {
 			jwt: services.JwtService{
 				Secret: envs.JwtSecret,
 			},
+			articles: services.ArticleService{},
 		},
 	}
 
 	apiRoute := router.Group("/api/v1")
+	authorizedRoutes := apiRoute.Group("")
 
-	authorizedRoutes := router.Group("")
 	authorizedRoutes.Use(apiConfig.AuthRequired())
-
-	apiConfig.RegisterPublicRoutes(apiRoute)
 	apiConfig.RegisterAuthorizedRoutes(authorizedRoutes)
+	apiConfig.RegisterPublicRoutes(apiRoute)
 
 	// Start server on port 8080 (default)
 	// Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)
