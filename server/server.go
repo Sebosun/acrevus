@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"sebosun/acrevus-go/internal/database"
+	"sebosun/acrevus-go/server/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -44,26 +45,37 @@ func StartServer() {
 	apiConfig := APIConfig{
 		DB:   dbQueries,
 		ENVS: envs,
+		services: Services{
+			jwt: services.JwtService{
+				Secret: envs.JwtSecret,
+			},
+		},
 	}
 
 	apiRoute := router.Group("/api/v1")
 
-	apiRoute.POST("/login", apiConfig.UserLogin)
-	apiRoute.POST("/register", apiConfig.UserRegister)
-
-	apiRoute.GET("/users", apiConfig.UserList)
-	apiRoute.GET("/users/:id", apiConfig.UserGet)
-	apiRoute.PATCH("/users/:id", apiConfig.UserUpdate)
-	apiRoute.DELETE("/users/:id", apiConfig.UserDelete)
-
 	authorizedRoutes := router.Group("")
 	authorizedRoutes.Use(apiConfig.AuthRequired())
 
-	authorizedRoutes.GET("/me", apiConfig.FetchMe)
-
-	apiRoute.POST("/article", apiConfig.FetchArticle)
+	apiConfig.RegisterPublicRoutes(apiRoute)
+	apiConfig.RegisterAuthorizedRoutes(authorizedRoutes)
 
 	// Start server on port 8080 (default)
 	// Server will listen on 0.0.0.0:8080 (localhost:8080 on Windows)
 	router.Run()
+}
+
+func (config *APIConfig) RegisterPublicRoutes(router *gin.RouterGroup) {
+	router.POST("/login", config.UserLogin)
+	router.POST("/register", config.UserRegister)
+
+	router.GET("/users", config.UserList)
+	router.GET("/users/:id", config.UserGet)
+	router.PATCH("/users/:id", config.UserUpdate)
+	router.DELETE("/users/:id", config.UserDelete)
+}
+
+func (config *APIConfig) RegisterAuthorizedRoutes(router *gin.RouterGroup) {
+	router.GET("/me", config.FetchMe)
+	router.POST("/article", config.FetchArticle)
 }

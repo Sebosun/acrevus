@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"sebosun/acrevus-go/internal/database"
+	"sebosun/acrevus-go/server/services"
 )
 
 type Envs struct {
@@ -16,6 +17,11 @@ type Envs struct {
 type APIConfig struct {
 	DB *database.Queries
 	ENVS Envs
+	services Services
+}
+
+type Services struct {
+	jwt services.JwtService
 }
 
 func ReadEnvs() Envs {

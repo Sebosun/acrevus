@@ -43,7 +43,7 @@ func (config *APIConfig) UserLogin(c *gin.Context) {
 		return
 	}
 
-	signedJWT, err := config.signJWT(int(user.ID))
+	signedJWT, err := config.services.jwt.SignJWT(int(user.ID))
 	if err != nil {
 		fmt.Printf("Error parsing signedJWT %s", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Something went wrong..."})
