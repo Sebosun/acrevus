@@ -9,7 +9,6 @@ import (
 	"sebosun/acrevus-go/analyzer"
 	"sebosun/acrevus-go/helpers"
 	"sebosun/acrevus-go/internal/database"
-	"sebosun/acrevus-go/server"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,7 +31,10 @@ func (config *APIConfig) FetchArticle(c *gin.Context) {
 	var userForm ArticleFetch
 
 	err := c.ShouldBindJSON(&userForm)
-	userID := c.MustGet(KeysUserID).(int)
+	userID := c.MustGet(KeysUserID).(int64)
+	params := database.LinkArticleToUserParams{
+		UserID:    int64(userID),
+	}
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No payload or invalid payload"})
@@ -45,6 +47,12 @@ func (config *APIConfig) FetchArticle(c *gin.Context) {
 	// TODO: Finish binding this with users already existing relationship with resource
 	// Happy path we already have it
 	if err == nil {
+		params.ArticleID = article.ID
+		_, err := config.DB.LinkArticleToUser(c.Request.Context(), params)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+		}
+
 		response := NewArticleResponse(article)
 		c.JSON(http.StatusOK, gin.H{
 			"article": response,
@@ -52,8 +60,8 @@ func (config *APIConfig) FetchArticle(c *gin.Context) {
 		return
 	}
 
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": ""})
+	if !errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 		return
 	}
 
@@ -76,15 +84,19 @@ func (config *APIConfig) FetchArticle(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Something went wrong..."})
 		return
 	}
+
+	params.ArticleID = saved.ID
+	_, err = config.DB.LinkArticleToUser(c.Request.Context(), params)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+	}
+
 	response := NewArticleResponse(saved)
 
 	c.JSON(http.StatusOK, gin.H{
 		"article": response,
 	})
-}
-
-func BindToResource() {
-
 }
 
 func NewArticleResponse(article database.Article) ArticleResponse {
@@ -108,4 +120,3 @@ func NewArticleResponse(article database.Article) ArticleResponse {
 
 	return response
 }
-

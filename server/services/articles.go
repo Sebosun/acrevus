@@ -1,9 +1,12 @@
 package services
 
-import "sebosun/acrevus-go/analyzer"
+import (
+	"sebosun/acrevus-go/analyzer"
+	"sebosun/acrevus-go/internal/database"
+)
 
 type ArticleService struct {
-	Secret string
+	DB *database.Queries
 }
 
 func (service *ArticleService) ArticleFetcherKurwa(url string) (analyzer.MainArticle, error) {
