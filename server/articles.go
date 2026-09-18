@@ -27,13 +27,22 @@ type ArticleResponse struct {
 	DeletedAt *time.Time `json:"deleted_at"`
 }
 
-func (config *APIConfig) FetchArticle(c *gin.Context) {
+type ArticleListResponse struct {
+	ID        int64      `json:"id"`
+	Title     string     `json:"title"`
+	Author    string     `json:"author"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+
+func (config *APIConfig) FetchAndLinkArticle(c *gin.Context) {
 	var userForm ArticleFetch
 
 	err := c.ShouldBindJSON(&userForm)
 	userID := c.MustGet(KeysUserID).(int64)
 	params := database.LinkArticleToUserParams{
-		UserID:    int64(userID),
+		UserID: int64(userID),
 	}
 
 	if err != nil {
@@ -90,6 +99,7 @@ func (config *APIConfig) FetchArticle(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+		return
 	}
 
 	response := NewArticleResponse(saved)
@@ -97,6 +107,48 @@ func (config *APIConfig) FetchArticle(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"article": response,
 	})
+}
+
+func (config *APIConfig) GetMyArticles(c *gin.Context) {
+	userID := c.MustGet(KeysUserID).(int64)
+
+	articles, err := config.DB.GetUserArticles(c.Request.Context(), userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		empty := make([]string, 0)
+		c.JSON(http.StatusOK, gin.H{"articles": empty})
+		return
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+		return
+	}
+
+	articlesResponse := []ArticleListResponse{}
+
+	for _, article := range articles {
+		response := NewArticleListResponse(article)
+		articlesResponse = append(articlesResponse, response)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"articles": articlesResponse})
+}
+
+func NewArticleListResponse(article database.Article) ArticleListResponse {
+	response := ArticleListResponse{
+		ID:        article.ID,
+		CreatedAt: article.CreatedAt,
+		UpdatedAt: article.UpdatedAt,
+	}
+
+	if article.Author.Valid {
+		response.Author = article.Author.String
+	}
+	if article.Author.Valid {
+		response.Title = article.Title.String
+	}
+
+	return response
 }
 
 func NewArticleResponse(article database.Article) ArticleResponse {
@@ -113,7 +165,6 @@ func NewArticleResponse(article database.Article) ArticleResponse {
 	if article.Author.Valid {
 		response.Title = article.Title.String
 	}
-
 	if article.DeletedAt.Valid {
 		response.DeletedAt = &article.DeletedAt.Time
 	}

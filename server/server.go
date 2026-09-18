@@ -79,5 +79,7 @@ func (config *APIConfig) RegisterPublicRoutes(router *gin.RouterGroup) {
 
 func (config *APIConfig) RegisterAuthorizedRoutes(router *gin.RouterGroup) {
 	router.GET("/me", config.FetchMe)
-	router.POST("/article", config.FetchArticle)
+	router.POST("/article", config.FetchAndLinkArticle)
+	router.GET("/article/users", config.GetMyArticles)
+	// router.GET("/article/:id", config.GetArticleByID)
 }
