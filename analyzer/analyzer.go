@@ -143,12 +143,18 @@ func (da *DensityAnalyzer) calculateDensity(textLength, linkCount int, area floa
 	}
 
 	baseDensity := float64(textLength) / area
-
 	linkPenalty := 1.0
+
+	// Safeguard ig, might break some posts that have tons of links to other sources
+	if (linkCount > 100) {
+		return 0.001
+	}
+
 	if textLength > 0 {
 		linkRatio := float64(linkCount) / float64(textLength) * 100
-		if linkRatio > 5 { // More than 5% links to text ratio
+		if linkRatio > 5.0 { // More than 5% links to text ratio
 			linkPenalty = 1.0 - (linkRatio-10)/100
+
 			if linkPenalty < 0.1 {
 				linkPenalty = 0.1
 			}
@@ -180,7 +186,6 @@ func Run(link string) (MainArticle, error) {
 
 	analyzer := NewDensityAnalyzer(page)
 	art, err := analyzer.ParseContentDensity()
-	fmt.Println("We got out, not we need to get back...")
 	if err != nil {
 		return MainArticle{}, fmt.Errorf("error running content analyzer %w", err)
 	}
