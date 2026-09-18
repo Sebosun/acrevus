@@ -28,13 +28,12 @@ type ArticleResponse struct {
 }
 
 type ArticleListResponse struct {
-	ID        int64      `json:"id"`
-	Title     string     `json:"title"`
-	Author    string     `json:"author"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	ID        int64     `json:"id"`
+	Title     string    `json:"title"`
+	Author    string    `json:"author"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
-
 
 func (config *APIConfig) FetchAndLinkArticle(c *gin.Context) {
 	var userForm ArticleFetch
@@ -96,7 +95,6 @@ func (config *APIConfig) FetchAndLinkArticle(c *gin.Context) {
 
 	params.ArticleID = saved.ID
 	_, err = config.DB.LinkArticleToUser(c.Request.Context(), params)
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
 		return
@@ -132,6 +130,43 @@ func (config *APIConfig) GetMyArticles(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"articles": articlesResponse})
+}
+
+func (config *APIConfig) GetArticleByID(c *gin.Context) {
+	articleID, ok := GetIDFromParams(c)
+	userID := c.MustGet(KeysUserID).(int64)
+	if !ok {
+		return
+	}
+
+	params := database.ArticleRelationExistsParams{
+		ArticleID: articleID,
+		UserID:    userID,
+	}
+
+	exists, err := config.DB.ArticleRelationExists(c.Request.Context(), params)
+
+	if !exists || errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Article doesn't exist or isn't users article"})
+		return
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+		return
+	}
+
+	article, err := config.DB.GetArticle(c.Request.Context(), articleID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Server error"})
+		return
+	}
+
+	response := NewArticleResponse(article)
+
+	c.JSON(http.StatusOK, gin.H{
+		"article": response,
+	})
 }
 
 func NewArticleListResponse(article database.Article) ArticleListResponse {

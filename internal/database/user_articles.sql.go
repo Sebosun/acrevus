@@ -9,6 +9,26 @@ import (
 	"context"
 )
 
+const articleRelationExists = `-- name: ArticleRelationExists :one
+SELECT EXISTS (
+  SELECT 1
+  FROM user_articles
+  WHERE user_id = $1 AND article_id = $2
+)
+`
+
+type ArticleRelationExistsParams struct {
+	UserID    int64
+	ArticleID int64
+}
+
+func (q *Queries) ArticleRelationExists(ctx context.Context, arg ArticleRelationExistsParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, articleRelationExists, arg.UserID, arg.ArticleID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const linkArticleToUser = `-- name: LinkArticleToUser :one
 INSERT INTO user_articles (user_id, article_id)
 VALUES ($1, $2)

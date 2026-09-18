@@ -58,7 +58,7 @@ func (config *APIConfig) FetchMe(c *gin.Context) {
 }
 
 func (config *APIConfig) UserGet(c *gin.Context) {
-	id, ok := GetUserID(c)
+	id, ok := GetIDFromParams(c)
 
 	if !ok {
 		return
@@ -99,7 +99,7 @@ func (config *APIConfig) UserList(c *gin.Context) {
 }
 
 func (config *APIConfig) UserUpdate(c *gin.Context) {
-	id, ok := GetUserID(c)
+	id, ok := GetIDFromParams(c)
 	if !ok {
 		return
 	}
@@ -136,7 +136,7 @@ func (config *APIConfig) UserUpdate(c *gin.Context) {
 }
 
 func (config *APIConfig) UserDelete(c *gin.Context) {
-	id, ok := GetUserID(c)
+	id, ok := GetIDFromParams(c)
 	if !ok {
 		return
 	}
@@ -163,11 +163,11 @@ func GetUserIDFromContext(c *gin.Context) (int64, bool) {
 	return id, true
 }
 
-func GetUserID(c *gin.Context) (int64, bool) {
+func GetIDFromParams(c *gin.Context) (int64, bool) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user ID must be a positive integer"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID is either missing or is not a number"})
 		return 0, false
 	}
 

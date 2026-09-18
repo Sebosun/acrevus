@@ -81,5 +81,5 @@ func (config *APIConfig) RegisterAuthorizedRoutes(router *gin.RouterGroup) {
 	router.GET("/me", config.FetchMe)
 	router.POST("/article", config.FetchAndLinkArticle)
 	router.GET("/article/users", config.GetMyArticles)
-	// router.GET("/article/:id", config.GetArticleByID)
+	router.GET("/article/:id", config.GetArticleByID)
 }
