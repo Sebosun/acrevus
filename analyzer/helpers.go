@@ -51,6 +51,8 @@ func elementFingerprint(el *rod.Element) string {
 func (da *DensityAnalyzer) redistributeToParents(blocks *[]ContentBlock) {
 	start := time.Now()
 
+	// FingerPrints are used to identify if element is the same element
+	// Since we might be comparing the same div to the same div, as we have different candidates
 	fpIndex := make(map[string][]int, len(*blocks))
 	for i := range *blocks {
 		bl := &(*blocks)[i]

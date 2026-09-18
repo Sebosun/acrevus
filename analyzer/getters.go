@@ -86,3 +86,13 @@ func (da *DensityAnalyzer) getTitle() string {
 
 	return title
 }
+
+func (da *DensityAnalyzer) getAuthor() string {
+	return ""
+}
+
+// func (da *DensityAnalyzer) getDescription() string {}
+//
+// func (da *DensityAnalyzer) getPublishDate() string {}
+//
+// func (da *DensityAnalyzer) getModifiedDate() string {}

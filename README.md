@@ -1,3 +1,18 @@
+# TODOS:
+
+- [ ] Articles should also return:
+    - [ ] Author
+    - [ ] Description
+    - [ ] Publish Date
+    - [ ] Last Updated Date
+    - [ ] Estimated time to read
+    - [ ] Original URL
+
+- [ ] Attaching tags to articles/content
+
+- [ ] Queueing the article fetching work
+- [ ] Adding option to add RSS feed
+
 # About
 
 Article fetcher / parser
@@ -30,14 +45,13 @@ Run all commands below from the repository root:
 
 ```sh
 cp .env.example .env # First-time setup; edit .env for your local settings.
-docker compose up -d --wait postgres
-goose up
+make db-migrate
 sqlc generate
 ```
 
-Compose starts PostgreSQL 17 on `127.0.0.1:5432` by default and keeps its data in
-the `postgres_data` named volume. Migrations are applied explicitly with Goose,
-after Postgres is healthy.
+Compose starts PostgreSQL 17 on `127.0.0.1:5433` by default and keeps its data in
+the `postgres_data` named volume. `make db-up` verifies that the host port is
+available and that Docker published it before `make db-migrate` applies migrations.
 
 ### Environment variables
 
@@ -55,7 +69,7 @@ PORT=8080
 | `POSTGRES_USER` | `acrevus`, database role created on first startup |
 | `POSTGRES_PASSWORD` | `acrevus_dev`, local development password |
 | `POSTGRES_DB` | `acrevus`, database created on first startup |
-| `POSTGRES_PORT` | `5432`, published host port; change in `.env` if already in use |
+| `POSTGRES_PORT` | `5433`, dedicated Acrevus host port |
 | `DATABASE_URL` | Host-side Postgres URL, expanded from the values above |
 | `GOOSE_DRIVER` | `postgres` |
 | `GOOSE_DBSTRING` | Expanded from `DATABASE_URL`; Goose's connection string |
@@ -68,17 +82,23 @@ development. A client running in the same Compose network would use
 `docker compose --env-file .env.test up -d --wait postgres` and
 `goose -env .env.test up`.
 
+Host ports are shared by every Docker project. Acrevus reserves `5433`; do not
+reuse it in another Compose project. If Docker reports Postgres as healthy but
+`make db-up` says its mapping is missing, run `docker compose down` (without
+`-v`) and then `make db-up`. This recreates the container while preserving the
+database volume.
+
 Postgres initialization variables only apply to an empty data volume; editing
 credentials in `.env` does not change an existing database role.
 
 ### Migrations and query generation
 
 ```sh
-goose status                    # Show applied/pending migrations.
+make db-status                  # Start and verify Postgres, then show migration status.
+make db-migrate                 # Start and verify Postgres, then apply pending migrations.
 goose -s create add_example sql  # Create the next numbered migration.
 # Fill in both the +goose Up and +goose Down sections.
 goose validate                  # Check migration file structure.
-goose up                        # Apply pending migrations.
 sqlc generate                   # Regenerate Go code after SQL changes.
 sqlc vet                        # Check SQL/configuration for errors.
 goose down                      # Roll back the most recent migration (may drop data).

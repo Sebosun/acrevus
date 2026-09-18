@@ -5,8 +5,6 @@ package analyzer
 import (
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -63,36 +61,13 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 		return MainArticle{}, fmt.Errorf("no content blocks found")
 	}
 
-	maxDensity := 0.0
-	var mainBlock *ContentBlock
-
 	da.weighScoreByTag(&blocks)
 	da.redistributeToParents(&blocks)
+	mainBlock := getMainBlock(&blocks)
 
-	for i, block := range blocks {
-		score := block.Density
-		if score > maxDensity {
-			maxDensity = score
-			mainBlock = &blocks[i]
-		}
-	}
-
-	// TODO: extract to separate function
-	da.clean(mainBlock.Element, "form")
-	da.clean(mainBlock.Element, "fieldset")
-	da.clean(mainBlock.Element, "object")
-	da.clean(mainBlock.Element, "embed")
-	da.clean(mainBlock.Element, "footer")
-	da.clean(mainBlock.Element, "link")
-	da.clean(mainBlock.Element, "aside")
-	da.clean(mainBlock.Element, "iframe")
-	da.clean(mainBlock.Element, "input")
-	da.clean(mainBlock.Element, "textarea")
-	da.clean(mainBlock.Element, "select")
-	da.clean(mainBlock.Element, "button")
-	da.cleanBr(mainBlock.Element)
-
+	da.bulkClean(mainBlock.Element)
 	title := da.getTitle()
+	author := da.getAuthor()
 
 	rawHTML := mainBlock.Element.MustHTML()
 	rawHTML = cleanStyle(cleanClass(rawHTML))
@@ -100,11 +75,24 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	art := MainArticle{
 		Content: *mainBlock,
 		Title:   title,
-		Author:  "",
+		Author:  author,
 		RawHTML: rawHTML,
 	}
 
 	return art, nil
+}
+
+func getMainBlock(blocks *[]ContentBlock) *ContentBlock {
+	maxDensity := 0.0
+	var mainBlock *ContentBlock
+	for i, block := range *blocks {
+		score := block.Density
+		if score > maxDensity {
+			maxDensity = score
+			mainBlock = &(*blocks)[i]
+		}
+	}
+	return mainBlock
 }
 
 func (da *DensityAnalyzer) analyzeElement(element *rod.Element) (ContentBlock, error) {
@@ -149,26 +137,6 @@ func (da *DensityAnalyzer) analyzeElement(element *rod.Element) (ContentBlock, e
 	return block, nil
 }
 
-func (da *DensityAnalyzer) cleanText(text string) string {
-	// Remove extra whitespace
-	re := regexp.MustCompile(`\s+`)
-	cleaned := re.ReplaceAllString(strings.TrimSpace(text), " ")
-
-	// Remove common non-content patterns
-	patterns := []string{
-		TextRegex[ClickHere],
-		TextRegex[Dates],
-		TextRegex[Emails],
-	}
-
-	for _, pattern := range patterns {
-		re := regexp.MustCompile(`(?i)` + pattern)
-		cleaned = re.ReplaceAllString(cleaned, "")
-	}
-
-	return strings.TrimSpace(cleaned)
-}
-
 func (da *DensityAnalyzer) calculateDensity(textLength, linkCount int, area float64) float64 {
 	if area <= 0 {
 		return 0
@@ -188,31 +156,6 @@ func (da *DensityAnalyzer) calculateDensity(textLength, linkCount int, area floa
 	}
 
 	return baseDensity * linkPenalty * 1000
-}
-
-// ObjectId will not persist in between calls
-func (da *DensityAnalyzer) isSameElement(el1, el2 *rod.Element) bool {
-	prop1 := el1.MustEval(`() => 
-		this.id + "|" 
-		+ this.tagName + '|' 
-		+ this.className + '|' 
-		+ this.childElementCount + '|'
-		+ this.clientHeight + '|'
-		+ this.clientWidth + '|'
-		+ this.textContent.substring(0, 50)
-	`).String()
-
-	prop2 := el2.MustEval(`() => 
-		this.id + "|" 
-		+ this.tagName + '|' 
-		+ this.className + '|' 
-		+ this.childElementCount + '|'
-		+ this.clientHeight + '|'
-		+ this.clientWidth + '|'
-		+ this.textContent.substring(0, 50)
-	`).String()
-
-	return prop1 == prop2
 }
 
 func SaveTempToDrive(art MainArticle) error {
