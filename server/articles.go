@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -76,6 +77,7 @@ func (config *APIConfig) FetchAndLinkArticle(c *gin.Context) {
 	// TODO: I will have to strip the url out of any bs so we can compare them directly
 	art, err := analyzer.Run(userForm.URL)
 	if err != nil {
+		fmt.Println("Error analyzing article", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unable to parse the article..."})
 		return
 	}

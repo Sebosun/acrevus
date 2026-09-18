@@ -153,9 +153,10 @@ func (config *APIConfig) UserDelete(c *gin.Context) {
 }
 
 func GetUserIDFromContext(c *gin.Context) (int64, bool) {
-	id, err := strconv.ParseInt(c.Param("userID"), 10, 64)
+	userID, exists := c.Get(KeysUserID)
+	id, ok := userID.(int64)
 
-	if err != nil || id <= 0 {
+	if !exists || !ok || id <= 0 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Something wrong with authorization"})
 		return 0, false
 	}

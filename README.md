@@ -3,6 +3,7 @@
 
 - [ ] Parser:
     - Penalize comment sections
+    - [ ] Fallback to fetch if can't do it with Rod
     - [ ] Articles should also return:
         - [ ] Author
         - [ ] Description
