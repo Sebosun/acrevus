@@ -1,12 +1,16 @@
 # TODOS:
+- [ ] Instance admin tooling for deleting articles etc.
 
-- [ ] Articles should also return:
-    - [ ] Author
-    - [ ] Description
-    - [ ] Publish Date
-    - [ ] Last Updated Date
-    - [ ] Estimated time to read
-    - [ ] Original URL
+- [ ] Parser:
+    - Penalize comment sections
+    - [ ] Articles should also return:
+        - [ ] Author
+        - [ ] Description
+        - [ ] Publish Date
+        - [ ] Last Updated Date
+        - [ ] Estimated time to read
+        - [ ] Original URL
+
 
 - [ ] Attaching tags to articles/content
 
