@@ -21,7 +21,7 @@ func (da *DensityAnalyzer) getTitle() string {
 		}
 	}
 
-	// Harder, getting info from
+	// Harder, getting info from <title> tag
 	title := ""
 	if info, err := da.page.Info(); err == nil {
 		title = info.Title
@@ -96,3 +96,4 @@ func (da *DensityAnalyzer) getAuthor() string {
 // func (da *DensityAnalyzer) getPublishDate() string {}
 //
 // func (da *DensityAnalyzer) getModifiedDate() string {}
+//

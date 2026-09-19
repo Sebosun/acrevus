@@ -1,8 +1,7 @@
 package analyzer
 
 import (
-	"fmt"
-	"time"
+	"strings"
 
 	"github.com/go-rod/rod"
 )
@@ -12,12 +11,16 @@ func (da *DensityAnalyzer) weighScoreByTag(blocks *[]ContentBlock) {
 		score := block.Density
 
 		switch block.TagName {
-		case "article", "main":
+		case "article":
+			score *= 10
+		case "main":
 			score *= 1.5
 		case "p":
 			score += 5
 		case "div":
 			score += 3
+		case "h1", "h2", "h3", "h4", "h5":
+			score += 2
 		case "option", "select", "li", "ul", "ol", "dl", "form":
 			score *= 0.01
 		case "INVALID":
@@ -29,6 +32,40 @@ func (da *DensityAnalyzer) weighScoreByTag(blocks *[]ContentBlock) {
 			score *= 1.2
 		case block.TextLength > 5000:
 			score *= 2
+		}
+
+		(*blocks)[i].Density = score
+	}
+}
+
+var discriminatedNames = []string{"comment", "comment-section", "comments", "avatar", "replies"}
+
+func (da *DensityAnalyzer) discriminate(blocks *[]ContentBlock) {
+	for i, block := range *blocks {
+		score := block.Density
+
+		if block.TextLength < 10 {
+			score -= 10
+		}
+
+		id, err := block.Element.Attribute("id")
+		if err == nil && *id != "" {
+			for _, name := range discriminatedNames {
+				found := strings.Contains(*id, name)
+				if found {
+					score -= 10
+				}
+			}
+		}
+		class, err := block.Element.Attribute("class")
+
+		if err == nil && *class != "" {
+			for _, name := range discriminatedNames {
+				found := strings.Contains(*id, name)
+				if found {
+					score -= 10
+				}
+			}
 		}
 
 		(*blocks)[i].Density = score
@@ -48,8 +85,16 @@ func elementFingerprint(el *rod.Element) string {
 	return el.MustEval(fingerprintJS).String()
 }
 
+func getHTMLElemID(el *rod.Element) string {
+	tagName, err := el.Attribute("id")
+	if err != nil {
+		return ""
+	}
+	return *tagName
+}
+
 func (da *DensityAnalyzer) redistributeToParents(blocks *[]ContentBlock) {
-	start := time.Now()
+	// start := time.Now()
 
 	// FingerPrints are used to identify if element is the same element
 	// Since we might be comparing the same div to the same div, as we have different candidates
@@ -62,7 +107,7 @@ func (da *DensityAnalyzer) redistributeToParents(blocks *[]ContentBlock) {
 		fpIndex[bl.CachedFingerprintString] = append(fpIndex[bl.CachedFingerprintString], i)
 	}
 
-	loopStart := time.Now()
+	// loopStart := time.Now()
 	for _, block := range *blocks {
 		parent, err := block.Element.Parent()
 		if err != nil {
@@ -92,6 +137,6 @@ func (da *DensityAnalyzer) redistributeToParents(blocks *[]ContentBlock) {
 			(*blocks)[i].Density += block.Density * 0.15
 		}
 	}
-	fmt.Printf("  [timer] parent redistribution loop: %v\n", time.Since(loopStart))
-	fmt.Printf("  [timer] redistributeToParents total: %v\n", time.Since(start))
+	// fmt.Printf("  [timer] parent redistribution loop: %v\n", time.Since(loopStart))
+	// fmt.Printf("  [timer] redistributeToParents total: %v\n", time.Since(start))
 }

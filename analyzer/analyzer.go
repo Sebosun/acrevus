@@ -4,7 +4,6 @@ package analyzer
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -39,7 +38,7 @@ type ContentBlock struct {
 }
 
 func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
-	elements, err := da.page.Elements("body, div, p, article, section, main, aside, header, footer")
+	elements, err := da.page.Elements("div, p, article, section, main, aside, header, footer, h1, h2, h3, h4, h5")
 	if err != nil {
 		return MainArticle{}, err
 	}
@@ -52,9 +51,7 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 			continue // Skip problematic elements
 		}
 
-		if block.TextLength > 150 {
-			blocks = append(blocks, block)
-		}
+		blocks = append(blocks, block)
 	}
 
 	if len(blocks) == 0 {
@@ -63,7 +60,7 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 
 	da.weighScoreByTag(&blocks)
 	da.redistributeToParents(&blocks)
-	mainBlock := getMainBlock(&blocks)
+	mainBlock := getHighestDensityBlock(&blocks)
 
 	da.bulkClean(mainBlock.Element)
 	title := da.getTitle()
@@ -82,7 +79,7 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	return art, nil
 }
 
-func getMainBlock(blocks *[]ContentBlock) *ContentBlock {
+func getHighestDensityBlock(blocks *[]ContentBlock) *ContentBlock {
 	maxDensity := 0.0
 	var mainBlock *ContentBlock
 	for i, block := range *blocks {
@@ -146,7 +143,7 @@ func (da *DensityAnalyzer) calculateDensity(textLength, linkCount int, area floa
 	linkPenalty := 1.0
 
 	// Safeguard ig, might break some posts that have tons of links to other sources
-	if (linkCount > 100) {
+	if linkCount > 100 {
 		return 0.001
 	}
 
@@ -162,17 +159,6 @@ func (da *DensityAnalyzer) calculateDensity(textLength, linkCount int, area floa
 	}
 
 	return baseDensity * linkPenalty * 1000
-}
-
-func SaveTempToDrive(art MainArticle) error {
-	file, err := os.Create("./temp.html")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	file.Write([]byte(art.RawHTML))
-
-	return nil
 }
 
 func Run(link string) (MainArticle, error) {
