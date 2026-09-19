@@ -31,7 +31,7 @@ func TestAnalyzer(t *testing.T) {
 		wantedTitle := "Barebones article"
 
 		gotTag := result.Content.TagName
-		gotTitle := result.Title
+		gotTitle := result.Metadata.Title
 
 		if err != nil {
 			t.Errorf("Error shouldn't happen here %s", err.Error())
@@ -55,7 +55,7 @@ func TestAnalyzer(t *testing.T) {
 		wantedTitle := "Barebones-navigation article"
 
 		gotTag := result.Content.TagName
-		gotTitle := result.Title
+		gotTitle := result.Metadata.Title
 
 		if err != nil {
 			t.Errorf("Error shouldn't happen here %s", err.Error())
@@ -79,7 +79,7 @@ func TestAnalyzer(t *testing.T) {
 		wantedTitle := "Different title"
 
 		gotTag := result.Content.TagName
-		gotTitle := result.Title
+		gotTitle := result.Metadata.Title
 
 		if err != nil {
 			t.Errorf("Error shouldn't happen here %s", err.Error())
@@ -104,7 +104,7 @@ func TestAnalyzer(t *testing.T) {
 		wantedTagID := "searched-for"
 
 		gotTag := result.Content.TagName
-		gotTitle := result.Title
+		gotTitle := result.Metadata.Title
 		gotTagID := getHTMLElemID(result.Content.Element)
 
 		if err != nil {
@@ -134,7 +134,7 @@ func TestAnalyzer(t *testing.T) {
 		wantedTagID := "post-body entry-content"
 
 		gotTag := result.Content.TagName
-		gotTitle := result.Title
+		gotTitle := result.Metadata.Title
 		gotTagID := getHTMLElemID(result.Content.Element)
 
 		if err != nil {

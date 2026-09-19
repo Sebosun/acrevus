@@ -1,17 +1,17 @@
-# TODOS:
+# TODOS
+
 - [ ] Instance admin tooling for deleting articles etc.
 
 - [ ] Parser:
-    - Penalize comment sections
-    - [ ] Fallback to fetch if can't do it with Rod
-    - [ ] Articles should also return:
-        - [ ] Author
-        - [ ] Description
-        - [ ] Publish Date
-        - [ ] Last Updated Date
-        - [ ] Estimated time to read
-        - [ ] Original URL
-
+  - Penalize comment sections
+  - [ ] Refactor with goquery for speed improvements n shit
+  - [x] Articles should also return:
+    - [x] Author
+    - [x] Description
+    - [x] Publish Date
+    - [ ] Last Updated Date
+    - [ ] Estimated time to read
+    - [x] Original URL
 
 - [ ] Attaching tags to articles/content
 
