@@ -46,35 +46,82 @@ func GetMetadata(document string) (Metadata, error) {
 		}
 	})
 
-	var data map[string]any
-	doc.Find("script").Each(func(_ int, s *goquery.Selection) {
-		scriptType, ok := s.Attr("type")
-		if ok && scriptType == "application/ld+json" {
-			data = extractJSOND(s.Text())
-		}
-	})
+	dupa := getJSONDMetadata(doc)
+	// metadata.Title = metaProperties["og:title"]
+	// metadata.SiteName = metaProperties["og:site_name"]
+	// metadata.Excerpt = metaProperties["description"]
 
-	metadata.Title = metaProperties["og:title"]
-	metadata.SiteName = metaProperties["og:site_name"]
-	metadata.Excerpt = metaProperties["description"]
-
-	for k := range data {
-		fmt.Println(k)
-	}
+	fmt.Println("Pubtime", dupa.PublishedTime)
+	fmt.Println("Sitename", dupa.SiteName)
+	fmt.Println("Excerpt", dupa.Excerpt)
+	fmt.Println("Byline", dupa.Byline)
+	fmt.Println("Dir", dupa.Dir)
+	fmt.Println("Lang", dupa.Lang)
+	fmt.Println("Title", dupa.Title)
 
 	return metadata, err
 }
 
+func getJSONDMetadata(doc *goquery.Document) Metadata {
+	var data map[string]any
+	doc.Find("script").Each(func(_ int, s *goquery.Selection) {
+		scriptType, ok := s.Attr("type")
+		if ok && scriptType == "application/ld+json" {
+			data = parseJSOND(s.Text())
+		}
+	})
 
-// TODO: tehre could technically be multiple jsondbs or some shit
+	return jsondToMetadata(data)
+}
+
+func jsondToMetadata(data map[string]any) Metadata {
+	metadata := Metadata{}
+
+	name, nameOK := data["name"].(string)
+	headline, haedlineOK := data["headline"].(string)
+
+	if !nameOK && haedlineOK {
+		metadata.Title = headline
+	} else if nameOK && !haedlineOK {
+		metadata.Title = name
+	} else {
+		metadata.Title = headline
+	}
+
+	description, descriptionOK := data["description"].(string)
+	if descriptionOK {
+		metadata.Excerpt = description
+	}
+
+	publisher, publisherOK := data["publisher"].(map[string]any)
+	if publisherOK {
+		publisherName, publisherNameOK := publisher["name"].(string)
+		if publisherNameOK {
+			metadata.SiteName = publisherName
+		}
+	}
+
+	datePublished, datePublishedOK := data["datePublished"].(string)
+	if datePublishedOK {
+		metadata.PublishedTime = datePublished
+	}
+
+	// author, authorOK := data["author"].(map[string]any)
+
+	return metadata
+}
+
+// TODO: there could technically be multiple jsondbs or some shit
 // Also could be graph
-// if (!parsed["@type"] && Array.isArray(parsed["@graph"])) {
-//   parsed = parsed["@graph"].find(it => {
-//     return (it["@type"] || "").match(this.REGEXPS.jsonLdArticleTypes);
-//   });
-// }
+//
+//	if (!parsed["@type"] && Array.isArray(parsed["@graph"])) {
+//	  parsed = parsed["@graph"].find(it => {
+//	    return (it["@type"] || "").match(this.REGEXPS.jsonLdArticleTypes);
+//	  });
+//	}
+//
 // For now we dont give a fuck
-func extractJSOND(rawJsond string) map[string]any {
+func parseJSOND(rawJsond string) map[string]any {
 	var data map[string]any
 
 	re := regexp.MustCompile(TextRegex[JSOND])
@@ -85,8 +132,6 @@ func extractJSOND(rawJsond string) map[string]any {
 		fmt.Println("error parsing json", err.Error())
 		return map[string]any{}
 	}
-
-	fmt.Println("type- --", data["@type"])
 
 	return data
 }

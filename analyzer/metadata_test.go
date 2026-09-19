@@ -7,7 +7,7 @@ import (
 )
 
 func TestExtractJSOND(t *testing.T) {
-	data := extractJSOND("\n<![CDATA[\n{\"headline\": \"Example article\"}\n]]>\n")
+	data := parseJSOND("\n<![CDATA[\n{\"headline\": \"Example article\"}\n]]>\n")
 
 	if data["headline"] != "Example article" {
 		t.Errorf("extractJSOND() headline = %v, want %q", data["headline"], "Example article")
