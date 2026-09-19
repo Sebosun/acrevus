@@ -21,9 +21,8 @@ func NewDensityAnalyzer(page *rod.Page) *DensityAnalyzer {
 
 type MainArticle struct {
 	Content ContentBlock
-	Title   string
-	Author  string
 	RawHTML string
+	Metadata Metadata
 }
 
 type ContentBlock struct {
@@ -63,17 +62,20 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	mainBlock := getHighestDensityBlock(&blocks)
 
 	da.bulkClean(mainBlock.Element)
-	title := da.getTitle()
-	author := da.getAuthor()
 
 	rawHTML := mainBlock.Element.MustHTML()
 	rawHTML = cleanStyle(cleanClass(rawHTML))
 
+	metadata, err := GetMetadata(da.page.MustHTML())
+
+	if err != nil {
+		return MainArticle{}, err
+	}
+
 	art := MainArticle{
 		Content: *mainBlock,
-		Title:   title,
-		Author:  author,
 		RawHTML: rawHTML,
+		Metadata: metadata,
 	}
 
 	return art, nil

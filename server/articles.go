@@ -83,10 +83,10 @@ func (config *APIConfig) FetchAndLinkArticle(c *gin.Context) {
 	}
 
 	articleDBParams := database.CreateArticleParams{
-		Author: helpers.NewNullString(art.Author),
+		Author: helpers.NewNullString(art.Metadata.Byline),
 		Url:    cleanedURL,
 		Html:   art.RawHTML,
-		Title:  helpers.NewNullString(art.Title),
+		Title:  helpers.NewNullString(art.Metadata.Title),
 	}
 
 	saved, err := config.DB.CreateArticle(c.Request.Context(), articleDBParams)

@@ -22,7 +22,7 @@ func (br *Scapper) generalParserAnalyze(link string) error {
 	}
 
 	data := SaveData{
-		title:    article.Title,
+		title:    article.Metadata.Title,
 		subtitle: "",
 		url:      link,
 		text:     article.Content.TextContent,

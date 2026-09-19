@@ -25,9 +25,6 @@ func GetMetadata(document string) (Metadata, error) {
 		return Metadata{}, err
 	}
 
-	fmt.Printf("")
-
-	metadata := Metadata{}
 	metaProperties := make(map[string]string)
 
 	doc.Find("meta").Each(func(i int, s *goquery.Selection) {
@@ -46,18 +43,66 @@ func GetMetadata(document string) (Metadata, error) {
 		}
 	})
 
-	dupa := getJSONDMetadata(doc)
-	// metadata.Title = metaProperties["og:title"]
-	// metadata.SiteName = metaProperties["og:site_name"]
-	// metadata.Excerpt = metaProperties["description"]
+	metadata := getJSONDMetadata(doc)
+	html := doc.Find("html").First()
+	metadata.Dir, _ = html.Attr("dir")
+	metadata.Lang, _ = html.Attr("lang")
 
-	fmt.Println("Pubtime", dupa.PublishedTime)
-	fmt.Println("Sitename", dupa.SiteName)
-	fmt.Println("Excerpt", dupa.Excerpt)
-	fmt.Println("Byline", dupa.Byline)
-	fmt.Println("Dir", dupa.Dir)
-	fmt.Println("Lang", dupa.Lang)
-	fmt.Println("Title", dupa.Title)
+	if metadata.Title == "" {
+		metadata.Title = firstNonEmpty(metaProperties,
+			"dc:title",
+			"dcterm:title",
+			"og:title",
+			"weibo:article:title",
+			"weibo:webpage:title",
+			"title",
+			"twitter:title",
+			"parsely-title")
+	}
+
+	if metadata.Excerpt == "" {
+		metadata.Excerpt = firstNonEmpty(metaProperties,
+			"dc:description",
+			"dcterm:description",
+			"og:description",
+			"weibo:article:description",
+			"weibo:webpage:description",
+			"description",
+			"twitter:description")
+	}
+
+	if metadata.SiteName == "" {
+		metadata.SiteName = firstNonEmpty(metaProperties, "og:site_name")
+	}
+
+	if metadata.PublishedTime == "" {
+		metadata.PublishedTime = firstNonEmpty(metaProperties,
+			"article:published_time",
+			"parsely-pub-date")
+	}
+
+	if metadata.Byline == "" {
+		metadata.Byline = firstNonEmpty(metaProperties,
+			"dc:creator",
+			"dcterm:creator",
+			"author",
+			"parsely-author",
+			"articleAuthor")
+	}
+
+	// If we still dont have authorship, let's crawl and look with rel tags
+	if metadata.Byline == "" {
+		doc.Find("[rel='author']").Each(func(_ int , s *goquery.Selection) {
+			metadata.Byline = s.Text()
+		})
+	}
+
+	// ... And itemprop tags
+	if metadata.Byline == "" {
+		doc.Find("[itemprop='author']").Each(func(_ int , s *goquery.Selection) {
+			metadata.Byline = s.Text()
+		})
+	}
 
 	return metadata, err
 }
@@ -77,36 +122,57 @@ func getJSONDMetadata(doc *goquery.Document) Metadata {
 func jsondToMetadata(data map[string]any) Metadata {
 	metadata := Metadata{}
 
-	name, nameOK := data["name"].(string)
-	headline, haedlineOK := data["headline"].(string)
-
-	if !nameOK && haedlineOK {
+	switch headline := data["headline"].(type) {
+	case string:
 		metadata.Title = headline
-	} else if nameOK && !haedlineOK {
-		metadata.Title = name
-	} else {
-		metadata.Title = headline
-	}
-
-	description, descriptionOK := data["description"].(string)
-	if descriptionOK {
-		metadata.Excerpt = description
-	}
-
-	publisher, publisherOK := data["publisher"].(map[string]any)
-	if publisherOK {
-		publisherName, publisherNameOK := publisher["name"].(string)
-		if publisherNameOK {
-			metadata.SiteName = publisherName
+	default:
+		switch name := data["name"].(type) {
+		case string:
+			metadata.Title = name
 		}
 	}
 
-	datePublished, datePublishedOK := data["datePublished"].(string)
-	if datePublishedOK {
+	switch description := data["description"].(type) {
+	case string:
+		metadata.Excerpt = strings.TrimSpace(description)
+	}
+
+	switch publisher := data["publisher"].(type) {
+	case map[string]any:
+		switch name := publisher["name"].(type) {
+		case string:
+			metadata.SiteName = name
+		}
+	}
+
+	switch datePublished := data["datePublished"].(type) {
+	case string:
 		metadata.PublishedTime = datePublished
 	}
 
-	// author, authorOK := data["author"].(map[string]any)
+	switch author := data["author"].(type) {
+	case string:
+		metadata.Byline = author
+	case map[string]any:
+		switch name := author["name"].(type) {
+		case string:
+			metadata.Byline = name
+		}
+	case []any:
+		var names []string
+		for _, item := range author {
+			switch person := item.(type) {
+			case string:
+				names = append(names, person)
+			case map[string]any:
+				switch name := person["name"].(type) {
+				case string:
+					names = append(names, name)
+				}
+			}
+		}
+		metadata.Byline = strings.Join(names, ", ")
+	}
 
 	return metadata
 }
@@ -133,28 +199,55 @@ func parseJSOND(rawJsond string) map[string]any {
 		return map[string]any{}
 	}
 
+	if !isSchemaJSOND(data) {
+		return map[string]any{}
+	}
+
 	return data
 }
 
 func isSchemaJSOND(data map[string]any) bool {
-	re := regexp.MustCompile(TextRegex[JSONLdArticleTypes])
+	articleTypeRE := regexp.MustCompile(TextRegex[JSONLdArticleTypes])
+	contextRE := regexp.MustCompile(`^https?://schema\.org(?:/.*)?$`)
 
-	contextString, contextIsString := data["@context"].(string)
-	inner, innerExists := data["@context"].(map[string]any)
+	var context string
+	switch value := data["@context"].(type) {
+	case string:
+		context = value
+	case map[string]any:
+		switch vocab := value["@vocab"].(type) {
+		case string:
+			context = vocab
+		}
+	}
 
-	if !contextIsString && !innerExists {
+	if !contextRE.MatchString(strings.TrimSpace(context)) {
 		return false
 	}
 
-	if contextIsString {
-		return re.Match([]byte(contextString))
+	switch articleType := data["@type"].(type) {
+	case string:
+		return articleTypeRE.MatchString(articleType)
+	case []any:
+		for _, value := range articleType {
+			switch articleType := value.(type) {
+			case string:
+				if articleTypeRE.MatchString(articleType) {
+					return true
+				}
+			}
+		}
 	}
 
-	innerString, innerIsString := inner["@vocab"].(string)
+	return false
+}
 
-	if !innerIsString {
-		return false
+func firstNonEmpty(values map[string]string, keys ...string) string {
+	for _, key := range keys {
+		value := strings.TrimSpace(values[key])
+		if value != "" {
+			return value
+		}
 	}
-
-	return re.Match([]byte(innerString))
+	return ""
 }
