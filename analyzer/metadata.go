@@ -19,6 +19,7 @@ type Metadata struct {
 	PublishedTime string
 }
 
+// Shamelessly stolen from mozilla/readibility
 func GetMetadata(document string) (Metadata, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(document))
 	if err != nil {
