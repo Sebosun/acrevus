@@ -19,13 +19,18 @@ type Metadata struct {
 	PublishedTime string
 }
 
-// Shamelessly stolen from mozilla/readibility
-func GetMetadata(document string) (Metadata, error) {
+
+func GetMetadataFromString(document string) (Metadata, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(document))
 	if err != nil {
 		return Metadata{}, err
 	}
 
+	return GetMetadata(doc), nil
+}
+
+// Shamelessly stolen from mozilla/readibility
+func GetMetadata(doc *goquery.Document) (Metadata) {
 	metaProperties := make(map[string]string)
 
 	doc.Find("meta").Each(func(i int, s *goquery.Selection) {
@@ -61,6 +66,11 @@ func GetMetadata(document string) (Metadata, error) {
 			"parsely-title")
 	}
 
+	// if its still empty, let's try different way
+	if metadata.Title == "" {
+		metadata.Title = getTitle(doc)
+	}
+
 	if metadata.Excerpt == "" {
 		metadata.Excerpt = firstNonEmpty(metaProperties,
 			"dc:description",
@@ -93,19 +103,19 @@ func GetMetadata(document string) (Metadata, error) {
 
 	// If we still dont have authorship, let's crawl and look with rel tags
 	if metadata.Byline == "" {
-		doc.Find("[rel='author']").Each(func(_ int , s *goquery.Selection) {
+		doc.Find("[rel='author']").Each(func(_ int, s *goquery.Selection) {
 			metadata.Byline = s.Text()
 		})
 	}
 
 	// ... And itemprop tags
 	if metadata.Byline == "" {
-		doc.Find("[itemprop='author']").Each(func(_ int , s *goquery.Selection) {
+		doc.Find("[itemprop='author']").Each(func(_ int, s *goquery.Selection) {
 			metadata.Byline = s.Text()
 		})
 	}
 
-	return metadata, err
+	return metadata
 }
 
 func getJSONDMetadata(doc *goquery.Document) Metadata {
@@ -241,6 +251,24 @@ func isSchemaJSOND(data map[string]any) bool {
 	}
 
 	return false
+}
+
+// we are assuming og:title already failed
+func getTitle(c *goquery.Document) string {
+	title := ""
+
+	c.Find("title").Each(func(i int, s *goquery.Selection) {
+		noChildren := s.Children().Length() == 0
+		if noChildren && title == "" {
+			title = s.Text()
+		}
+	})
+
+
+	re := regexp.MustCompile(`\s{2,}`)
+	title = re.ReplaceAllString(strings.TrimSpace(title), " ")
+
+	return title
 }
 
 func firstNonEmpty(values map[string]string, keys ...string) string {

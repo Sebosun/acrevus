@@ -1,86 +1,47 @@
 package analyzer
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func Test_getMetadata(t *testing.T) {
-	tests := []struct {
-		name    string
-		fixture string
-		want    Metadata
-		wantErr bool
-	}{
-		{
-			name:    "ACLU article",
-			fixture: "aclu.html",
-			want: Metadata{
-				Title:         "Facebook Is Tracking Me Even Though I’m Not on Facebook",
-				Byline:        "Daniel Kahn Gillmor",
-				Dir:           "ltr",
-				Lang:          "en",
-				Excerpt:       "Facebook collects data about people who have never even opted in. But there are ways these non-users can protect themselves.",
-				SiteName:      "American Civil Liberties Union",
-				PublishedTime: "2018-04-05T06:00",
-			},
-			wantErr: false,
-		},
-		{
-			name:    "API Fetching",
-			fixture: "api-fetching.html",
-			want: Metadata{
-				Title:         "This API is so Fetching!",
-				Byline:        "Nikhil Marathe",
-				Dir:           "",
-				Lang:          "en-US",
-				Excerpt:       "For more than a decade the Web has used XMLHttpRequest (XHR) to achieve asynchronous requests in JavaScript. While very useful, XHR is not a very ...",
-				SiteName:      "Mozilla Hacks – the Web developer blog",
-				PublishedTime: "",
-			},
-			wantErr: false,
-		},
+	sources, err := os.ReadDir(filepath.Join("metadata", "source"))
+	if err != nil {
+		t.Fatalf("read metadata sources: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			document, err := os.ReadFile(filepath.Join("metadata", tt.fixture))
+	for _, source := range sources {
+		if source.IsDir() || filepath.Ext(source.Name()) != ".html" {
+			continue
+		}
+
+		name := strings.TrimSuffix(source.Name(), filepath.Ext(source.Name()))
+		t.Run(name, func(t *testing.T) {
+			document, err := os.ReadFile(filepath.Join("metadata", "source", source.Name()))
 			if err != nil {
-				t.Fatalf("read fixture %q: %v", tt.fixture, err)
+				t.Fatalf("read source fixture: %v", err)
 			}
 
-			got, gotErr := GetMetadata(string(document))
-			if gotErr != nil {
-				if !tt.wantErr {
-					t.Errorf("getMetadata() failed: %v", gotErr)
-				}
-				return
-			}
-			if tt.wantErr {
-				t.Fatal("getMetadata() succeeded unexpectedly")
+			expected, err := os.ReadFile(filepath.Join("metadata", "expected", name+".json"))
+			if err != nil {
+				t.Fatalf("read expected fixture: %v", err)
 			}
 
-			if got.Title != tt.want.Title {
-				t.Errorf("Title = %q, want %q", got.Title, tt.want.Title)
+			var want Metadata
+			if err := json.Unmarshal(expected, &want); err != nil {
+				t.Fatalf("parse expected fixture: %v", err)
 			}
-			if got.Byline != tt.want.Byline {
-				t.Errorf("Byline = %q, want %q", got.Byline, tt.want.Byline)
+
+			got, err := GetMetadataFromString(string(document))
+			if err != nil {
+				t.Fatalf("GetMetadata() failed: %v", err)
 			}
-			if got.Dir != tt.want.Dir {
-				t.Errorf("Dir = %q, want %q", got.Dir, tt.want.Dir)
-			}
-			if got.Lang != tt.want.Lang {
-				t.Errorf("Lang = %q, want %q", got.Lang, tt.want.Lang)
-			}
-			if got.Excerpt != tt.want.Excerpt {
-				t.Errorf("Excerpt = %q, want %q", got.Excerpt, tt.want.Excerpt)
-			}
-			if got.SiteName != tt.want.SiteName {
-				t.Errorf("SiteName = %q, want %q", got.SiteName, tt.want.SiteName)
-			}
-			if got.PublishedTime != tt.want.PublishedTime {
-				t.Errorf("PublishedTime = %q, want %q", got.PublishedTime, tt.want.PublishedTime)
+			if got != want {
+				t.Errorf("GetMetadata() = %+v, want %+v", got, want)
 			}
 		})
 	}

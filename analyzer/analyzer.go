@@ -66,7 +66,7 @@ func (da *DensityAnalyzer) ParseContentDensity() (MainArticle, error) {
 	rawHTML := mainBlock.Element.MustHTML()
 	rawHTML = cleanStyle(cleanClass(rawHTML))
 
-	metadata, err := GetMetadata(da.page.MustHTML())
+	metadata, err := GetMetadataFromString(da.page.MustHTML())
 
 	if err != nil {
 		return MainArticle{}, err
