@@ -13,10 +13,13 @@ type RewriteResult struct {
 	Metadata Metadata
 }
 
-var ErrEmptyBody = errors.New("body is empty")
+var (
+	ErrEmptyBody = errors.New("body is empty")
+	ErrTooShort  = errors.New("text is too short")
+	ErrNoParents = errors.New("has no parents")
+)
 
-var defaultCandidates = "section,h2,h3,h4,h5,h6,p,td,pre"
-
+var defaultCandidates = "article,section,h2,h3,h4,h5,h6,p,td,pre"
 
 func AnalyzerRewrite(document string) (RewriteResult, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(document))
@@ -37,35 +40,74 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 		return RewriteResult{}, ErrEmptyBody
 	}
 
-	candidates := doc.Find(defaultCandidates)
-	
-	walk(body)
+	defaultCandidates := doc.Find(defaultCandidates)
+	elementsToScore := selectionToSlice(defaultCandidates)
+	elementsToScore = append(elementsToScore, selectionToSlice(defaultCandidates)...)
 
+	candidates := decideWorthyCandidates(elementsToScore)
+
+	// printSliceSelection(candidates)
+
+	idx := getTopCandidates(candidates)
+	if idx != -1 {
+		result.HTML = candidates[idx].selector.Text()
+	}
+
+	result.Metadata = GetMetadata(doc)
+
+	fmt.Println(result.HTML)
 	return result, nil
 }
 
-func walk(s *goquery.Selection) []*goquery.Selection {
-	elementsToScore := []*goquery.Selection{}
-
-	s.Each(func(_ int, s *goquery.Selection) {
-		nodeType := getNodeType(s)
-
-		// nodes with too short of a text get excluded
-		if len(s.Text()) < 25 { }
-	})
-	return elementsToScore
+type Candidate struct {
+	selector *goquery.Selection
+	score    int
+	isEmpty  bool
 }
 
-func isNodeACandidate(s *goquery.Selection) bool {
+func decideWorthyCandidates(elementsToScore []*goquery.Selection) []Candidate {
+	candidates := []Candidate{}
+
+	for _, s := range elementsToScore {
+		can, err := isNodeACandidate(s)
+		if err != nil {
+			// fmt.Println("Error - ", err.Error())
+			continue
+		}
+
+		candidates = append(candidates, can)
+
+		children := selectionToSlice(can.selector.Children())
+		result := decideWorthyCandidates(children)
+		candidates = append(candidates, result...)
+	}
+
+	return candidates
+}
+
+func getTopCandidates(candidates []Candidate) int {
+	topIdx := -1
+	topScore := 0
+
+	for idx, v := range candidates {
+		if v.score > topScore {
+			topIdx = idx
+		}
+	}
+
+	return topIdx
+}
+
+func isNodeACandidate(s *goquery.Selection) (Candidate, error) {
 	text := s.Text()
 	// nodes with too short of a text gets skipped
 	if len(s.Text()) < 25 {
-		return false
+		return Candidate{}, ErrTooShort
 	}
 
 	// elems with no parents get skipped
 	if s.Parent().Length() == 0 {
-		return false
+		return Candidate{}, ErrNoParents
 	}
 
 	contentScore := 0
@@ -85,7 +127,16 @@ func isNodeACandidate(s *goquery.Selection) bool {
 		contentScore += 1
 	}
 
-	return true
+	return Candidate{selector: s, score: contentScore, isEmpty: true}, nil
+}
+
+func selectionToSlice(s *goquery.Selection) []*goquery.Selection {
+	acc := []*goquery.Selection{}
+
+	s.Each(func(_ int, s *goquery.Selection) {
+		acc = append(acc, s)
+	})
+	return acc
 }
 
 func getNodeType(s *goquery.Selection) string {
@@ -95,6 +146,14 @@ func getNodeType(s *goquery.Selection) string {
 
 	node := s.Nodes[0]
 	return node.Data
+}
+
+func printSliceSelection(items []Candidate) {
+	for _, c := range items {
+		fmt.Printf("Selector %s - score %d", getNodeType(c.selector), c.score)
+		fmt.Printf("\n")
+		fmt.Println(c.selector.Text())
+	}
 }
 
 func printH(s *goquery.Selection) {

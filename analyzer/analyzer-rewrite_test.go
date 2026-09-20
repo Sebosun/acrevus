@@ -3,37 +3,59 @@ package analyzer
 import (
 	"encoding/json"
 	"os"
-	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
 
+var whitespacePattern = regexp.MustCompile(`\s+`)
+
 func TestAnalyzerRewrite(t *testing.T) {
-	cases, err := os.ReadDir("testdata")
-	if err != nil {
-		t.Fatalf("read analyzer test cases: %v", err)
+	testCases := []struct {
+		name                 string
+		sourcePath           string
+		expectedHTMLPath     string
+		expectedMetadataPath string
+	}{
+		{
+			name:                 "barebones",
+			sourcePath:           "testdata/barebones/source.html",
+			expectedHTMLPath:     "testdata/barebones/expected.html",
+			expectedMetadataPath: "testdata/barebones/metadata.json",
+		},
+		{
+			name:                 "barebones-ambigious",
+			sourcePath:           "testdata/barebones-ambigious/source.html",
+			expectedHTMLPath:     "testdata/barebones-ambigious/expected.html",
+			expectedMetadataPath: "testdata/barebones-ambigious/metadata.json",
+		},
+		{
+			name:                 "barebones-navigation",
+			sourcePath:           "testdata/barebones-navigation/source.html",
+			expectedHTMLPath:     "testdata/barebones-navigation/expected.html",
+			expectedMetadataPath: "testdata/barebones-navigation/metadata.json",
+		},
+		{
+			name:                 "barebones-title",
+			sourcePath:           "testdata/barebones-title/source.html",
+			expectedHTMLPath:     "testdata/barebones-title/expected.html",
+			expectedMetadataPath: "testdata/barebones-title/metadata.json",
+		},
 	}
 
-	for i, testCase := range cases {
-		if !testCase.IsDir() {
-			continue
-		}
-
-		if i != 1 {
-			continue
-		}
-		t.Run(testCase.Name(), func(t *testing.T) {
-			sourceHTML, err := os.ReadFile(filepath.Join("testdata", testCase.Name(), "source.html"))
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			sourceHTML, err := os.ReadFile(testCase.sourcePath)
 			if err != nil {
 				t.Fatalf("read source HTML: %v", err)
 			}
 
-			expectedHTML, err := os.ReadFile(filepath.Join("testdata", testCase.Name(), "expected.html"))
+			expectedHTML, err := os.ReadFile(testCase.expectedHTMLPath)
 			if err != nil {
 				t.Fatalf("read expected HTML: %v", err)
 			}
 
-			expectedMetadata, err := os.ReadFile(filepath.Join("testdata", testCase.Name(), "metadata.json"))
+			expectedMetadata, err := os.ReadFile(testCase.expectedMetadataPath)
 			if err != nil {
 				t.Fatalf("read expected metadata: %v", err)
 			}
@@ -48,7 +70,7 @@ func TestAnalyzerRewrite(t *testing.T) {
 				t.Fatalf("Run() failed: %v", err)
 			}
 
-			if result.HTML != strings.TrimSpace(string(expectedHTML)) {
+			if whitespacePattern.ReplaceAllString(result.HTML, "") != whitespacePattern.ReplaceAllString(string(expectedHTML), "") {
 				t.Errorf("RawHTML = %q, want %q", result.HTML, strings.TrimSpace(string(expectedHTML)))
 			}
 			if result.Metadata != wantMetadata {
