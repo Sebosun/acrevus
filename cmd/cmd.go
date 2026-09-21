@@ -12,5 +12,6 @@ func Execute() {
 	rootCmd.AddCommand(fetchCmd)
 	rootCmd.AddCommand(uiCmd)
 	rootCmd.AddCommand(serverCmd)
+	rootCmd.AddCommand(runOnHardCodedFile)
 	rootCmd.Execute()
 }

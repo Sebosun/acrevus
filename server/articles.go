@@ -75,7 +75,7 @@ func (config *APIConfig) FetchAndLinkArticle(c *gin.Context) {
 	}
 
 	// TODO: I will have to strip the url out of any bs so we can compare them directly
-	art, err := analyzer.Run(userForm.URL)
+	art, err := analyzer.RunWithGoquery(userForm.URL)
 	if err != nil {
 		fmt.Println("Error analyzing article", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Unable to parse the article..."})
@@ -85,7 +85,7 @@ func (config *APIConfig) FetchAndLinkArticle(c *gin.Context) {
 	articleDBParams := database.CreateArticleParams{
 		Author: helpers.NewNullString(art.Metadata.Byline),
 		Url:    cleanedURL,
-		Html:   art.RawHTML,
+		Html:   art.HTML,
 		Title:  helpers.NewNullString(art.Metadata.Title),
 	}
 

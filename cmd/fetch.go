@@ -20,7 +20,7 @@ var fetchCmd = &cobra.Command{
 			fmt.Println("Multiple url links included, not supported yet")
 			os.Exit(0)
 		}
-		fmt.Println("Fetch start...")
+
 		link := args[0]
 		_, err := url.ParseRequestURI(link)
 		if err != nil {
@@ -61,10 +61,33 @@ var parseURL = &cobra.Command{
 			os.Exit(1)
 		}
 
-		_, err = analyzer.Run(link)
+		res, err := analyzer.RunWithGoquery(link)
 		if err != nil {
 			fmt.Println("Error running analyzer")
 			os.Exit(1)
 		}
+
+		fmt.Println(res.HTML)
+	},
+}
+
+var runOnHardCodedFile = &cobra.Command{
+	Use:     "run",
+	Aliases: []string{"r"},
+	Short:   "Run a harcoded file",
+	Run: func(cmd *cobra.Command, args []string) {
+		sourceHTML, err := os.ReadFile("/home/bes/Code/projects/acrevus/acrevus-go/feser.html")
+		if err != nil {
+			fmt.Println("Error reading file")
+			return
+		}
+
+		res, err := analyzer.AnalyzerRewrite(string(sourceHTML))
+		if err != nil {
+			fmt.Println("Error running analyzer")
+			os.Exit(1)
+		}
+
+		fmt.Println(res.HTML)
 	},
 }

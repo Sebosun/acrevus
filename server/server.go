@@ -51,7 +51,6 @@ func StartServer() {
 			jwt: services.JwtService{
 				Secret: envs.JwtSecret,
 			},
-			articles: services.ArticleService{},
 		},
 	}
 

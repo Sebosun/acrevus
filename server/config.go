@@ -9,26 +9,25 @@ import (
 )
 
 type Envs struct {
-	PORT   string
-	DBURL string
+	PORT      string
+	DBURL     string
 	JwtSecret string
 }
 
 type APIConfig struct {
-	DB *database.Queries
-	ENVS Envs
+	DB       *database.Queries
+	ENVS     Envs
 	services Services
 }
 
 type Services struct {
 	jwt services.JwtService
-	articles services.ArticleService
 }
 
 func ReadEnvs() Envs {
 	envs := Envs{
-		PORT:   os.Getenv("PORT"),
-		DBURL: os.Getenv("DATABASE_URL"),
+		PORT:      os.Getenv("PORT"),
+		DBURL:     os.Getenv("DATABASE_URL"),
 		JwtSecret: os.Getenv("JWT_SECRET"),
 	}
 
