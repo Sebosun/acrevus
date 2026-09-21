@@ -4,3 +4,4 @@ acrevus-go
 .env
 .env.*
 !.env.example
+/bin

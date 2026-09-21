@@ -1,7 +1,9 @@
 POSTGRES_PORT := 5433
 POSTGRES_ADDRESS := 127.0.0.1:$(POSTGRES_PORT)
 
-.PHONY: db-up db-migrate db-status
+
+APP := acrevus
+.PHONY: db-up db-migrate db-status build bra server
 
 db-up:
 	@mapped="$$(docker compose port postgres 5432 2>/dev/null || :)"; \
@@ -21,3 +23,13 @@ db-migrate: db-up
 
 db-status: db-up
 	goose status
+
+build: 
+	go build -o bin/$(APP) .
+
+server:
+	go build -o bin/$(APP) . && ./bin/${APP} server
+
+# run mock
+bra:
+	go build -o bin/$(APP) . && ./bin/${APP} r
