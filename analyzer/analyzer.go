@@ -180,3 +180,21 @@ func Run(link string) (MainArticle, error) {
 
 	return art, nil
 }
+
+func RunWithGoquery(link string) (RewriteResult, error) {
+	browser := rod.New().NoDefaultDevice().MustConnect()
+	defer browser.MustClose()
+
+	page := browser.MustPage(link)
+	if err := page.Timeout(pageLoadTimeout).WaitLoad(); err != nil {
+		return RewriteResult{}, fmt.Errorf("wait for page load: %w", err)
+	}
+
+	art, err := AnalyzerRewrite(page.MustHTML())
+
+	if err != nil {
+		return RewriteResult{}, fmt.Errorf("error running content analyzer %w", err)
+	}
+
+	return art, nil
+}

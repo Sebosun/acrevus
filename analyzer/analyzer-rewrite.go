@@ -3,6 +3,7 @@ package analyzer
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -13,13 +14,25 @@ type RewriteResult struct {
 	Metadata Metadata
 }
 
+type Candidate struct {
+	selector *goquery.Selection
+	score    int
+	isEmpty  bool
+}
+
 var (
 	ErrEmptyBody = errors.New("body is empty")
 	ErrTooShort  = errors.New("text is too short")
 	ErrNoParents = errors.New("has no parents")
 )
 
-var defaultCandidates = "article,section,h2,h3,h4,h5,h6,p,td,pre"
+var (
+	defaultCandidates  = "article,section,h2,h3,h4,h5,h6,p,td,pre"
+	unlikelyCandidates = regexp.MustCompile(
+		`(?i)-ad-|ai2html|banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|footer|gdpr|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote`,
+	)
+	okMaybeItsACandidate = regexp.MustCompile(`(?i)and|article|body|column|content|main|mathjax|shadow`)
+)
 
 func AnalyzerRewrite(document string) (RewriteResult, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(document))
@@ -28,6 +41,7 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 	}
 
 	result := RewriteResult{}
+	result.Metadata = GetMetadata(doc)
 
 	metadata := GetMetadata(doc)
 	result.Metadata = metadata
@@ -35,43 +49,30 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 	body := doc.Find("body").First()
 
 	if body.Length() == 0 {
-		printH(body)
-		printT(body)
 		return RewriteResult{}, ErrEmptyBody
 	}
 
+	clearUnlikelyCandidates(doc)
 	defaultCandidates := doc.Find(defaultCandidates)
 	elementsToScore := selectionToSlice(defaultCandidates)
 	elementsToScore = append(elementsToScore, selectionToSlice(defaultCandidates)...)
 
+	// TODO: redistribute to garndparents
 	candidates := decideWorthyCandidates(elementsToScore)
 
-	// printSliceSelection(candidates)
-
-	idx := getTopCandidates(candidates)
+	idx := getTopCandidate(candidates)
 	if idx != -1 {
 		result.HTML = candidates[idx].selector.Text()
 	}
-
-	result.Metadata = GetMetadata(doc)
-
-	fmt.Println(result.HTML)
 	return result, nil
-}
-
-type Candidate struct {
-	selector *goquery.Selection
-	score    int
-	isEmpty  bool
 }
 
 func decideWorthyCandidates(elementsToScore []*goquery.Selection) []Candidate {
 	candidates := []Candidate{}
 
 	for _, s := range elementsToScore {
-		can, err := isNodeACandidate(s)
+		can, err := decideCandidate(s)
 		if err != nil {
-			// fmt.Println("Error - ", err.Error())
 			continue
 		}
 
@@ -85,12 +86,15 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection) []Candidate {
 	return candidates
 }
 
-func getTopCandidates(candidates []Candidate) int {
+func getTopCandidate(candidates []Candidate) int {
 	topIdx := -1
-	topScore := 0
+	topScore := 0.0
 
-	for idx, v := range candidates {
-		if v.score > topScore {
+	for idx, candidate := range candidates {
+		result := getLinkDensity(candidate.selector)
+		scoreAfterLinks := float64(candidate.score) * (1 - result)
+		if scoreAfterLinks > topScore {
+			topScore = scoreAfterLinks
 			topIdx = idx
 		}
 	}
@@ -98,7 +102,30 @@ func getTopCandidates(candidates []Candidate) int {
 	return topIdx
 }
 
-func isNodeACandidate(s *goquery.Selection) (Candidate, error) {
+func getLinkDensity(s *goquery.Selection) float64 {
+	text := s.Text()
+	if len(text) == 0 {
+		return 0
+	}
+
+	textLength := float64(len(text))
+	linksLength := 0.0
+
+	s.Find("a").Each(func(_ int, s *goquery.Selection) {
+		href, ok := s.Attr("href")
+		if ok {
+			linksLength += float64(len(href))
+		}
+	})
+
+	if linksLength <= 0.0 {
+		return 0.0
+	}
+
+	return textLength / linksLength
+}
+
+func decideCandidate(s *goquery.Selection) (Candidate, error) {
 	text := s.Text()
 	// nodes with too short of a text gets skipped
 	if len(s.Text()) < 25 {
@@ -139,7 +166,7 @@ func selectionToSlice(s *goquery.Selection) []*goquery.Selection {
 	return acc
 }
 
-func getNodeType(s *goquery.Selection) string {
+func getNodeTag(s *goquery.Selection) string {
 	if len(s.Nodes) == 0 {
 		return "invalid"
 	}
@@ -148,11 +175,54 @@ func getNodeType(s *goquery.Selection) string {
 	return node.Data
 }
 
+func clearUnlikelyCandidates(doc *goquery.Document) {
+	doc.Find("[class], [id]").Each(func(_ int, s *goquery.Selection) {
+		className, _ := s.Attr("class")
+		id, _ := s.Attr("id")
+
+		value := strings.ToLower(className + " " + id)
+
+		isUnlikelyClass := unlikelyCandidates.Match([]byte(value))
+		mightBeCandidate := okMaybeItsACandidate.Match([]byte(value))
+
+		tagName := getNodeTag(s)
+
+		hasCode := hasAncestorTag(s, "code")
+		hasTable := hasAncestorTag(s, "table")
+
+		if tagName != "a" && tagName != "body" && isUnlikelyClass && !mightBeCandidate && !hasCode && !hasTable {
+			s.Remove()
+		}
+	})
+}
+
+func hasAncestorTag(s *goquery.Selection, tag string) bool {
+	maxDepth := 3
+
+	cur := s
+	for range maxDepth {
+		parent := cur.Parent()
+
+		// means element is empty == parent doesnt exist
+		if parent.Length() == 0 {
+			return false
+		}
+		tagName := getNodeTag(s.Parent())
+		if tagName == tag {
+			return true
+		}
+
+		cur = s.Parent()
+	}
+
+	return false
+}
+
 func printSliceSelection(items []Candidate) {
 	for _, c := range items {
-		fmt.Printf("Selector %s - score %d", getNodeType(c.selector), c.score)
-		fmt.Printf("\n")
+		fmt.Printf("Selector %s - score %d ", getNodeTag(c.selector), c.score)
 		fmt.Println(c.selector.Text())
+		fmt.Printf("\n")
 	}
 }
 
