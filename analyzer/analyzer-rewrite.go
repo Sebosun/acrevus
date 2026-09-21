@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -16,8 +17,9 @@ type RewriteResult struct {
 
 type Candidate struct {
 	selector *goquery.Selection
-	score    int
+	score    float64
 	isEmpty  bool
+	depth    int
 }
 
 var (
@@ -27,11 +29,25 @@ var (
 )
 
 var (
-	defaultCandidates  = "article,section,h2,h3,h4,h5,h6,p,td,pre"
+	defaultCandidates  = "body,article,section,h2,h3,h4,h5,h6,p,td,pre"
 	unlikelyCandidates = regexp.MustCompile(
 		`(?i)-ad-|ai2html|banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|footer|gdpr|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote`,
 	)
 	okMaybeItsACandidate = regexp.MustCompile(`(?i)and|article|body|column|content|main|mathjax|shadow`)
+	presentationalAttributes = []string{
+    "align",
+    "background",
+    "bgcolor",
+    "border",
+    "cellpadding",
+    "cellspacing",
+    "frame",
+    "hspace",
+    "rules",
+    "style",
+    "valign",
+    "vspace",
+  }
 )
 
 func AnalyzerRewrite(document string) (RewriteResult, error) {
@@ -52,22 +68,28 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 		return RewriteResult{}, ErrEmptyBody
 	}
 
+	cleanScripts(doc)
 	clearUnlikelyCandidates(doc)
 	defaultCandidates := doc.Find(defaultCandidates)
 	elementsToScore := selectionToSlice(defaultCandidates)
 	elementsToScore = append(elementsToScore, selectionToSlice(defaultCandidates)...)
 
 	// TODO: redistribute to garndparents
-	candidates := decideWorthyCandidates(elementsToScore)
+	candidates := decideWorthyCandidates(elementsToScore, 0)
 
 	idx := getTopCandidate(candidates)
 	if idx != -1 {
 		result.HTML = candidates[idx].selector.Text()
 	}
+
+	for _, v := range candidates {
+		fmt.Println(v.score, len(v.selector.Text()))
+	}
+
 	return result, nil
 }
 
-func decideWorthyCandidates(elementsToScore []*goquery.Selection) []Candidate {
+func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []Candidate {
 	candidates := []Candidate{}
 
 	for _, s := range elementsToScore {
@@ -75,11 +97,29 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection) []Candidate {
 		if err != nil {
 			continue
 		}
+		can.depth = depth
 
 		candidates = append(candidates, can)
 
 		children := selectionToSlice(can.selector.Children())
-		result := decideWorthyCandidates(children)
+		result := decideWorthyCandidates(children, depth+1)
+
+		for _, child := range result {
+
+			divider := 0.0
+
+			switch depth {
+			case 0:
+				divider = 1
+			case 1:
+				divider = 2
+			default:
+				divider = float64(depth * 3)
+			}
+
+			can.score += child.score / divider
+		}
+
 		candidates = append(candidates, result...)
 	}
 
@@ -87,42 +127,18 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection) []Candidate {
 }
 
 func getTopCandidate(candidates []Candidate) int {
-	topIdx := -1
-	topScore := 0.0
-
 	for idx, candidate := range candidates {
 		result := getLinkDensity(candidate.selector)
 		scoreAfterLinks := float64(candidate.score) * (1 - result)
-		if scoreAfterLinks > topScore {
-			topScore = scoreAfterLinks
-			topIdx = idx
-		}
+
+		candidates[idx].score = scoreAfterLinks
 	}
 
-	return topIdx
-}
-
-func getLinkDensity(s *goquery.Selection) float64 {
-	text := s.Text()
-	if len(text) == 0 {
-		return 0
-	}
-
-	textLength := float64(len(text))
-	linksLength := 0.0
-
-	s.Find("a").Each(func(_ int, s *goquery.Selection) {
-		href, ok := s.Attr("href")
-		if ok {
-			linksLength += float64(len(href))
-		}
+	slices.SortFunc(candidates, func(a Candidate, b Candidate) int {
+		return int(a.score - b.score)
 	})
 
-	if linksLength <= 0.0 {
-		return 0.0
-	}
-
-	return textLength / linksLength
+	return 0
 }
 
 func decideCandidate(s *goquery.Selection) (Candidate, error) {
@@ -137,13 +153,13 @@ func decideCandidate(s *goquery.Selection) (Candidate, error) {
 		return Candidate{}, ErrNoParents
 	}
 
-	contentScore := 0
+	contentScore := 0.0
 
 	// Add a point for the paragraph itself as a base.
 	contentScore += 1
 
 	// Add points for any commas within this paragraph.
-	contentScore += len(strings.Split(text, ","))
+	contentScore += float64(len(strings.Split(text, ",")))
 
 	switch {
 	case len(text) >= 300:
@@ -155,24 +171,6 @@ func decideCandidate(s *goquery.Selection) (Candidate, error) {
 	}
 
 	return Candidate{selector: s, score: contentScore, isEmpty: true}, nil
-}
-
-func selectionToSlice(s *goquery.Selection) []*goquery.Selection {
-	acc := []*goquery.Selection{}
-
-	s.Each(func(_ int, s *goquery.Selection) {
-		acc = append(acc, s)
-	})
-	return acc
-}
-
-func getNodeTag(s *goquery.Selection) string {
-	if len(s.Nodes) == 0 {
-		return "invalid"
-	}
-
-	node := s.Nodes[0]
-	return node.Data
 }
 
 func clearUnlikelyCandidates(doc *goquery.Document) {
@@ -196,40 +194,12 @@ func clearUnlikelyCandidates(doc *goquery.Document) {
 	})
 }
 
-func hasAncestorTag(s *goquery.Selection, tag string) bool {
-	maxDepth := 3
+func cleanScripts(doc *goquery.Document) {
+	doc.Find("script").Each(func(_ int, s *goquery.Selection) {
+		s.Remove()
+	})
 
-	cur := s
-	for range maxDepth {
-		parent := cur.Parent()
-
-		// means element is empty == parent doesnt exist
-		if parent.Length() == 0 {
-			return false
-		}
-		tagName := getNodeTag(s.Parent())
-		if tagName == tag {
-			return true
-		}
-
-		cur = s.Parent()
-	}
-
-	return false
-}
-
-func printSliceSelection(items []Candidate) {
-	for _, c := range items {
-		fmt.Printf("Selector %s - score %d ", getNodeTag(c.selector), c.score)
-		fmt.Println(c.selector.Text())
-		fmt.Printf("\n")
-	}
-}
-
-func printH(s *goquery.Selection) {
-	fmt.Println(s.Html())
-}
-
-func printT(s *goquery.Selection) {
-	fmt.Println(s.Text())
+	doc.Find("noscript").Each(func(_ int, s *goquery.Selection) {
+		s.Remove()
+	})
 }
