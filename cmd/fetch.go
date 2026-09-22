@@ -74,7 +74,7 @@ var runOnHardCodedFile = &cobra.Command{
 	Aliases: []string{"r"},
 	Short:   "Run a harcoded file",
 	Run: func(cmd *cobra.Command, args []string) {
-		sourceHTML, err := os.ReadFile("/home/bes/Code/projects/acrevus/acrevus-go/feser.html")
+		sourceHTML, err := os.ReadFile("/home/bes/Code/projects/acrevus/acrevus-go/testing.html")
 		if err != nil {
 			fmt.Println("Error reading file")
 			return

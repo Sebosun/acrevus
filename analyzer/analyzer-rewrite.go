@@ -2,11 +2,9 @@ package analyzer
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -20,7 +18,6 @@ type Candidate struct {
 	selector    *goquery.Selection
 	score       float64
 	isEmpty     bool
-	depth       int
 	fingerprint string
 }
 
@@ -54,12 +51,21 @@ var (
 	negative = regexp.MustCompile(`(?i)-ad-|hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|footer|gdpr|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|widget`)
 )
 
+const defaultMaxParentDepth = 5
+
 type AnalyzerGoquery struct {
 	maxParentDepth int
 }
 
+func NewAnalyzerGoquery() *AnalyzerGoquery {
+	return &AnalyzerGoquery{maxParentDepth: defaultMaxParentDepth}
+}
 
 func AnalyzerRewrite(document string) (RewriteResult, error) {
+	return NewAnalyzerGoquery().Parse(document)
+}
+
+func (a *AnalyzerGoquery) Parse(document string) (RewriteResult, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(document))
 	if err != nil {
 		return RewriteResult{}, err
@@ -77,27 +83,21 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 		return RewriteResult{}, ErrEmptyBody
 	}
 
-	cleanPresentational(doc)
-	clearUnlikelyCandidates(doc)
+	a.cleanPresentational(doc)
+	a.clearUnlikelyCandidates(doc)
 
-	start := time.Now()
 	defaultCandidates := doc.Find(defaultCandidates)
-	elementsToScore := selectionToSlice(defaultCandidates)
-	elementsToScore = append(elementsToScore, selectionToSlice(defaultCandidates)...)
-	fmt.Println("Scoring", time.Since(start))
+	elementsToScore := a.selectionToSlice(defaultCandidates)
+	elementsToScore = append(elementsToScore, a.selectionToSlice(defaultCandidates)...)
 
-	start = time.Now()
-	candidates := decideWorthyCandidates(elementsToScore, 0)
-	fmt.Println("Worthy candidates", time.Since(start))
+	candidates := a.decideWorthyCandidates(elementsToScore, 0)
 
-	start = time.Now()
-	getTopCandidate(candidates)
-	fmt.Println("Top candidates", time.Since(start))
+	a.getTopCandidate(candidates)
 
 	winner := candidates[0]
 
-	cleanScripts(winner.selector)
-	cleanUnecessary(winner.selector)
+	a.cleanScripts(winner.selector)
+	a.cleanUnecessary(winner.selector)
 
 	html, err := goquery.OuterHtml(winner.selector)
 	if err != nil {
@@ -108,17 +108,16 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 	return result, nil
 }
 
-func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []Candidate {
+func (a *AnalyzerGoquery) decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []Candidate {
 	candidates := []Candidate{}
 
 	for _, s := range elementsToScore {
-		can, err := decideCandidate(s)
+		candidate, err := a.decideCandidate(s)
 		if err != nil {
 			continue
 		}
-		can.depth = depth
 
-		parents := getParents(s, 5)
+		parents := a.getParents(s)
 		if len(parents) <= 0 {
 			continue
 		}
@@ -126,16 +125,16 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []C
 		// We're skipping the initial items we selected
 		// We're looking up h1, h2s etc - they are not likely to be the article itself
 		// but vital part of the article
-		candidates = append(candidates, can)
+		candidates = append(candidates, candidate)
 
-		for i, v := range parents {
-			parentCandidate, err := decideCandidate(v)
+		for parentDepth, parent := range parents {
+			parentCandidate, err := a.decideCandidate(parent)
 			if err != nil {
 				continue
 			}
 
 			divider := 0.0
-			switch i {
+			switch parentDepth {
 			case 0:
 				divider = 1
 			case 1:
@@ -144,7 +143,7 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []C
 				divider = float64(depth * 3)
 			}
 
-			parentCandidate.score += can.score / divider
+			parentCandidate.score += candidate.score / divider
 			candidates = append(candidates, parentCandidate)
 		}
 
@@ -153,11 +152,11 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []C
 	return candidates
 }
 
-func getParents(s *goquery.Selection, maxDepth int) []*goquery.Selection {
+func (a *AnalyzerGoquery) getParents(s *goquery.Selection) []*goquery.Selection {
 	curDepth := 0
 	cur := s.Parent()
 	parents := []*goquery.Selection{}
-	for maxDepth > curDepth {
+	for a.maxParentDepth > curDepth {
 		if cur.Length() == 0 {
 			break
 		}
@@ -170,9 +169,9 @@ func getParents(s *goquery.Selection, maxDepth int) []*goquery.Selection {
 	return parents
 }
 
-func getTopCandidate(candidates []Candidate) {
+func (a *AnalyzerGoquery) getTopCandidate(candidates []Candidate) {
 	for idx, candidate := range candidates {
-		result := getLinkDensity(candidate.selector)
+		result := a.getLinkDensity(candidate.selector)
 		scoreAfterLinks := float64(candidate.score) * (1 - result)
 
 		candidates[idx].score = scoreAfterLinks
@@ -183,7 +182,7 @@ func getTopCandidate(candidates []Candidate) {
 	})
 }
 
-func decideCandidate(s *goquery.Selection) (Candidate, error) {
+func (a *AnalyzerGoquery) decideCandidate(s *goquery.Selection) (Candidate, error) {
 	text := s.Text()
 	// nodes with too short of a text gets skipped
 	if len(s.Text()) < 25 {
@@ -212,7 +211,7 @@ func decideCandidate(s *goquery.Selection) (Candidate, error) {
 		contentScore += 1
 	}
 
-	tagName := getNodeTag(s)
+	tagName := a.getNodeTag(s)
 
 	switch tagName {
 	case "div":
@@ -242,12 +241,12 @@ func decideCandidate(s *goquery.Selection) (Candidate, error) {
 		contentScore -= 6
 	}
 
-	contentScore += float64(getClassWeight(s))
+	contentScore += float64(a.getClassWeight(s))
 
 	return Candidate{selector: s, score: contentScore, isEmpty: true}, nil
 }
 
-func getClassWeight(s *goquery.Selection) int {
+func (a *AnalyzerGoquery) getClassWeight(s *goquery.Selection) int {
 	weight := 0
 
 	class, ok := s.Attr("class")
@@ -280,7 +279,7 @@ func getClassWeight(s *goquery.Selection) int {
 	return weight
 }
 
-func clearUnlikelyCandidates(doc *goquery.Document) {
+func (a *AnalyzerGoquery) clearUnlikelyCandidates(doc *goquery.Document) {
 	doc.Find("[class], [id]").Each(func(_ int, s *goquery.Selection) {
 		className, _ := s.Attr("class")
 		id, _ := s.Attr("id")
@@ -290,10 +289,10 @@ func clearUnlikelyCandidates(doc *goquery.Document) {
 		isUnlikelyClass := unlikelyCandidates.Match([]byte(value))
 		mightBeCandidate := okMaybeItsACandidate.Match([]byte(value))
 
-		tagName := getNodeTag(s)
+		tagName := a.getNodeTag(s)
 
-		hasCode := hasAncestorTag(s, "code")
-		hasTable := hasAncestorTag(s, "table")
+		hasCode := a.hasAncestorTag(s, "code")
+		hasTable := a.hasAncestorTag(s, "table")
 
 		if tagName != "a" && tagName != "body" && isUnlikelyClass && !mightBeCandidate && !hasCode && !hasTable {
 			s.Remove()
@@ -301,32 +300,32 @@ func clearUnlikelyCandidates(doc *goquery.Document) {
 	})
 }
 
-func removeAllNodesWithSelector(doc *goquery.Selection, selector string) {
+func (a *AnalyzerGoquery) removeAllNodesWithSelector(doc *goquery.Selection, selector string) {
 	doc.Find(selector).Remove()
 }
 
-func cleanScripts(doc *goquery.Selection) {
-	removeAllNodesWithSelector(doc, "script")
-	removeAllNodesWithSelector(doc, "noscript")
+func (a *AnalyzerGoquery) cleanScripts(doc *goquery.Selection) {
+	a.removeAllNodesWithSelector(doc, "script")
+	a.removeAllNodesWithSelector(doc, "noscript")
 }
 
-func cleanUnecessary(doc *goquery.Selection) {
-	removeAllNodesWithSelector(doc, "object")
-	removeAllNodesWithSelector(doc, "embed")
-	removeAllNodesWithSelector(doc, "footer")
-	removeAllNodesWithSelector(doc, "link")
-	removeAllNodesWithSelector(doc, "aside")
+func (a *AnalyzerGoquery) cleanUnecessary(doc *goquery.Selection) {
+	a.removeAllNodesWithSelector(doc, "object")
+	a.removeAllNodesWithSelector(doc, "embed")
+	a.removeAllNodesWithSelector(doc, "footer")
+	a.removeAllNodesWithSelector(doc, "link")
+	a.removeAllNodesWithSelector(doc, "aside")
 
-	removeAllNodesWithSelector(doc, "iframe")
-	removeAllNodesWithSelector(doc, "input")
-	removeAllNodesWithSelector(doc, "textarea")
-	removeAllNodesWithSelector(doc, "select")
-	removeAllNodesWithSelector(doc, "button")
+	a.removeAllNodesWithSelector(doc, "iframe")
+	a.removeAllNodesWithSelector(doc, "input")
+	a.removeAllNodesWithSelector(doc, "textarea")
+	a.removeAllNodesWithSelector(doc, "select")
+	a.removeAllNodesWithSelector(doc, "button")
 
-	removeAllNodesWithSelector(doc, "field")
-	removeAllNodesWithSelector(doc, "fieldset")
+	a.removeAllNodesWithSelector(doc, "field")
+	a.removeAllNodesWithSelector(doc, "fieldset")
 }
 
-func cleanPresentational(doc *goquery.Document) {
+func (a *AnalyzerGoquery) cleanPresentational(doc *goquery.Document) {
 	doc.Find("style").Remove()
 }

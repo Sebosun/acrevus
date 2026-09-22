@@ -6,7 +6,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func getLinkDensity(s *goquery.Selection) float64 {
+func (a *AnalyzerGoquery) getLinkDensity(s *goquery.Selection) float64 {
 	text := s.Text()
 	if len(text) == 0 {
 		return 0
@@ -29,7 +29,7 @@ func getLinkDensity(s *goquery.Selection) float64 {
 	return textLength / linksLength
 }
 
-func getNodeTag(s *goquery.Selection) string {
+func (a *AnalyzerGoquery) getNodeTag(s *goquery.Selection) string {
 	if len(s.Nodes) == 0 {
 		return "invalid"
 	}
@@ -38,7 +38,7 @@ func getNodeTag(s *goquery.Selection) string {
 	return node.Data
 }
 
-func hasAncestorTag(s *goquery.Selection, tag string) bool {
+func (a *AnalyzerGoquery) hasAncestorTag(s *goquery.Selection, tag string) bool {
 	maxDepth := 3
 
 	cur := s
@@ -49,7 +49,7 @@ func hasAncestorTag(s *goquery.Selection, tag string) bool {
 		if parent.Length() == 0 {
 			return false
 		}
-		tagName := getNodeTag(s.Parent())
+		tagName := a.getNodeTag(s.Parent())
 		if tagName == tag {
 			return true
 		}
@@ -60,23 +60,23 @@ func hasAncestorTag(s *goquery.Selection, tag string) bool {
 	return false
 }
 
-func printSliceSelection(items []Candidate) {
+func (a *AnalyzerGoquery) printSliceSelection(items []Candidate) {
 	for _, c := range items {
-		fmt.Printf("Selector %s - score %d ", getNodeTag(c.selector), c.score)
+		fmt.Printf("Selector %s - score %.2f ", a.getNodeTag(c.selector), c.score)
 		fmt.Println(c.selector.Text())
 		fmt.Printf("\n")
 	}
 }
 
-func printH(s *goquery.Selection) {
+func (a *AnalyzerGoquery) printH(s *goquery.Selection) {
 	fmt.Println(s.Html())
 }
 
-func printT(s *goquery.Selection) {
+func (a *AnalyzerGoquery) printT(s *goquery.Selection) {
 	fmt.Println(s.Text())
 }
 
-func selectionToSlice(s *goquery.Selection) []*goquery.Selection {
+func (a *AnalyzerGoquery) selectionToSlice(s *goquery.Selection) []*goquery.Selection {
 	acc := []*goquery.Selection{}
 
 	s.Each(func(_ int, s *goquery.Selection) {
@@ -84,4 +84,3 @@ func selectionToSlice(s *goquery.Selection) []*goquery.Selection {
 	})
 	return acc
 }
-
