@@ -61,13 +61,11 @@ var parseURL = &cobra.Command{
 			os.Exit(1)
 		}
 
-		res, err := analyzer.RunWithGoquery(link)
+		_, err = analyzer.RunWithGoquery(link)
 		if err != nil {
-			fmt.Println("Error running analyzer")
+			fmt.Println("Error running analyzer", err)
 			os.Exit(1)
 		}
-
-		fmt.Println(res.HTML)
 	},
 }
 
@@ -82,12 +80,10 @@ var runOnHardCodedFile = &cobra.Command{
 			return
 		}
 
-		res, err := analyzer.AnalyzerRewrite(string(sourceHTML))
+		_, err = analyzer.AnalyzerRewrite(string(sourceHTML))
 		if err != nil {
 			fmt.Println("Error running analyzer")
 			os.Exit(1)
 		}
-
-		fmt.Println(res.HTML)
 	},
 }
