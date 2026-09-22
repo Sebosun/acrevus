@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"golang.org/x/net/html"
 )
 
 type RewriteResult struct {
@@ -54,6 +54,11 @@ var (
 	negative = regexp.MustCompile(`(?i)-ad-|hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|footer|gdpr|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|widget`)
 )
 
+type AnalyzerGoquery struct {
+	maxParentDepth int
+}
+
+
 func AnalyzerRewrite(document string) (RewriteResult, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(document))
 	if err != nil {
@@ -73,22 +78,28 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 	}
 
 	cleanPresentational(doc)
-
 	clearUnlikelyCandidates(doc)
+
+	start := time.Now()
 	defaultCandidates := doc.Find(defaultCandidates)
 	elementsToScore := selectionToSlice(defaultCandidates)
 	elementsToScore = append(elementsToScore, selectionToSlice(defaultCandidates)...)
+	fmt.Println("Scoring", time.Since(start))
 
+	start = time.Now()
 	candidates := decideWorthyCandidates(elementsToScore, 0)
+	fmt.Println("Worthy candidates", time.Since(start))
 
+	start = time.Now()
 	getTopCandidate(candidates)
+	fmt.Println("Top candidates", time.Since(start))
 
 	winner := candidates[0]
 
 	cleanScripts(winner.selector)
 	cleanUnecessary(winner.selector)
 
-	html, err := winner.selector.Html()
+	html, err := goquery.OuterHtml(winner.selector)
 	if err != nil {
 		return RewriteResult{}, err
 	}
@@ -98,7 +109,6 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 }
 
 func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []Candidate {
-	seen := make(map[*html.Node]struct{})
 	candidates := []Candidate{}
 
 	for _, s := range elementsToScore {
@@ -116,20 +126,16 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []C
 		// We're skipping the initial items we selected
 		// We're looking up h1, h2s etc - they are not likely to be the article itself
 		// but vital part of the article
-		if depth > 0 {
-			candidates = append(candidates, can)
-			node := s.Get(0)
-			seen[node] = struct{}{}
-		}
+		candidates = append(candidates, can)
 
-		// children := selectionToSlice(can.selector.Children())
-		result := decideWorthyCandidates(parents, depth+1)
-
-		for _, par := range result {
+		for i, v := range parents {
+			parentCandidate, err := decideCandidate(v)
+			if err != nil {
+				continue
+			}
 
 			divider := 0.0
-
-			switch depth {
+			switch i {
 			case 0:
 				divider = 1
 			case 1:
@@ -138,18 +144,10 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []C
 				divider = float64(depth * 3)
 			}
 
-			par.score += par.score / divider
+			parentCandidate.score += can.score / divider
+			candidates = append(candidates, parentCandidate)
 		}
 
-
-		for _, v := range result {
-			node := s.Get(0)
-			_, exists := seen[node]
-			if (!exists) {
-				seen[node] = struct{}{}
-				candidates = append(candidates, v)
-			}
-		}
 	}
 
 	return candidates
@@ -181,7 +179,7 @@ func getTopCandidate(candidates []Candidate) {
 	}
 
 	slices.SortFunc(candidates, func(a Candidate, b Candidate) int {
-		return int(a.score - b.score)
+		return int(b.score - a.score)
 	})
 }
 

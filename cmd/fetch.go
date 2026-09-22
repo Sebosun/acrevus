@@ -80,10 +80,17 @@ var runOnHardCodedFile = &cobra.Command{
 			return
 		}
 
-		_, err = analyzer.AnalyzerRewrite(string(sourceHTML))
+		result, err := analyzer.AnalyzerRewrite(string(sourceHTML))
 		if err != nil {
 			fmt.Println("Error running analyzer")
 			os.Exit(1)
 		}
+
+		err = os.WriteFile("output.html", []byte(result.HTML), 0644)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+		fmt.Println("Saved to output.html")
 	},
 }
