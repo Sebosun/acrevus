@@ -5,3 +5,6 @@ acrevus-go
 .env.*
 !.env.example
 /bin
+
+./testing.html
+./output.html
