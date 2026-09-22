@@ -80,7 +80,6 @@ func AnalyzerRewrite(document string) (RewriteResult, error) {
 	elementsToScore = append(elementsToScore, selectionToSlice(defaultCandidates)...)
 
 	candidates := decideWorthyCandidates(elementsToScore, 0)
-	candidates = deduplicateCandidates(candidates)
 
 	getTopCandidate(candidates)
 
@@ -114,17 +113,13 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []C
 			continue
 		}
 
-
 		// We're skipping the initial items we selected
 		// We're looking up h1, h2s etc - they are not likely to be the article itself
 		// but vital part of the article
-		// We're also preventing duplicates 
-		node := can.selector.Get(0)
-		_, exists := seen[node]
-		if !exists && depth > 0 {
-			seen[node] = struct{}{}
+		if depth > 0 {
 			candidates = append(candidates, can)
-			continue
+			node := s.Get(0)
+			seen[node] = struct{}{}
 		}
 
 		// children := selectionToSlice(can.selector.Children())
@@ -143,10 +138,18 @@ func decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []C
 				divider = float64(depth * 3)
 			}
 
-			can.score += par.score / divider
+			par.score += par.score / divider
 		}
 
-		candidates = append(candidates, result...)
+
+		for _, v := range result {
+			node := s.Get(0)
+			_, exists := seen[node]
+			if (!exists) {
+				seen[node] = struct{}{}
+				candidates = append(candidates, v)
+			}
+		}
 	}
 
 	return candidates
