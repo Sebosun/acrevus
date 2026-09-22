@@ -2,11 +2,13 @@ package analyzer
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
 )
 
 type RewriteResult struct {
@@ -32,6 +34,14 @@ var (
 	unlikelyCandidates = regexp.MustCompile(
 		`(?i)-ad-|ai2html|banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|footer|gdpr|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote`,
 	)
+	unlikelyRoles = []string{
+		"menu", "menubar",
+		"complementary",
+		"navigation",
+		"alert",
+		"alertdialog",
+		"dialog",
+	}
 	okMaybeItsACandidate     = regexp.MustCompile(`(?i)and|article|body|column|content|main|mathjax|shadow`)
 	presentationalAttributes = []string{
 		"align",
@@ -47,18 +57,23 @@ var (
 		"valign",
 		"vspace",
 	}
-	positive = regexp.MustCompile(`(?i)article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
-	negative = regexp.MustCompile(`(?i)-ad-|hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|footer|gdpr|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|widget`)
+	positive      = regexp.MustCompile(`(?i)article|body|content|entry|hentry|h-entry|main|page|pagination|post|text|blog|story`)
+	negative      = regexp.MustCompile(`(?i)-ad-|hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|footer|gdpr|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|widget`)
+	shareElements = regexp.MustCompile(`(?i)(\b|_)(share|sharedaddy)(\b|_),`)
 )
 
-const defaultMaxParentDepth = 5
+const (
+	defaultMaxParentDepth = 5
+	defaultTreshold       = 500
+)
 
 type AnalyzerGoquery struct {
-	maxParentDepth int
+	MaxParentDepth int
+	TextTreshold   int
 }
 
 func NewAnalyzerGoquery() *AnalyzerGoquery {
-	return &AnalyzerGoquery{maxParentDepth: defaultMaxParentDepth}
+	return &AnalyzerGoquery{MaxParentDepth: defaultMaxParentDepth, TextTreshold: defaultTreshold}
 }
 
 func AnalyzerRewrite(document string) (RewriteResult, error) {
@@ -71,11 +86,8 @@ func (a *AnalyzerGoquery) Parse(document string) (RewriteResult, error) {
 		return RewriteResult{}, err
 	}
 
-	result := RewriteResult{}
-	result.Metadata = GetMetadata(doc)
-
-	metadata := GetMetadata(doc)
-	result.Metadata = metadata
+	parseResult := RewriteResult{}
+	parseResult.Metadata = GetMetadata(doc)
 
 	body := doc.Find("body").First()
 
@@ -83,8 +95,8 @@ func (a *AnalyzerGoquery) Parse(document string) (RewriteResult, error) {
 		return RewriteResult{}, ErrEmptyBody
 	}
 
-	a.cleanPresentational(doc)
 	a.clearUnlikelyCandidates(doc)
+	a.clearEmptyElements(doc)
 
 	defaultCandidates := doc.Find(defaultCandidates)
 	elementsToScore := a.selectionToSlice(defaultCandidates)
@@ -96,16 +108,18 @@ func (a *AnalyzerGoquery) Parse(document string) (RewriteResult, error) {
 
 	winner := candidates[0]
 
+	a.cleanShare(winner.selector)
 	a.cleanScripts(winner.selector)
 	a.cleanUnecessary(winner.selector)
+	a.cleanPresentational(winner.selector)
 
 	html, err := goquery.OuterHtml(winner.selector)
 	if err != nil {
 		return RewriteResult{}, err
 	}
 
-	result.HTML = html
-	return result, nil
+	parseResult.HTML = html
+	return parseResult, nil
 }
 
 func (a *AnalyzerGoquery) decideWorthyCandidates(elementsToScore []*goquery.Selection, depth int) []Candidate {
@@ -156,7 +170,7 @@ func (a *AnalyzerGoquery) getParents(s *goquery.Selection) []*goquery.Selection 
 	curDepth := 0
 	cur := s.Parent()
 	parents := []*goquery.Selection{}
-	for a.maxParentDepth > curDepth {
+	for a.MaxParentDepth > curDepth {
 		if cur.Length() == 0 {
 			break
 		}
@@ -298,6 +312,32 @@ func (a *AnalyzerGoquery) clearUnlikelyCandidates(doc *goquery.Document) {
 			s.Remove()
 		}
 	})
+
+	for _, role := range unlikelyRoles {
+		roleQuery := fmt.Sprintf(`[role="%s"]`, role)
+		doc.Find(roleQuery).Remove()
+	}
+}
+
+func (a *AnalyzerGoquery) clearEmptyElements(doc *goquery.Document) {
+	tagNames := []string{"div", "section", "header", "h1", "h2", "h3", "h4", "h5", "h6"}
+
+	for _, tag := range tagNames {
+		doc.Find(tag).Each(func(_ int, s *goquery.Selection) {
+			if len(s.Nodes) > 0 {
+				// https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
+				// golang for whatever reason decided ElementNode is 3
+				isElementNode := s.Nodes[0].Type == html.ElementNode
+				hasNoChildren := s.Children().Length() == 0
+				noText := len(s.Text()) == 0
+
+				isEmpty := isElementNode && hasNoChildren && noText
+				if (isEmpty) {
+					s.Remove()
+				}
+			}
+		})
+	}
 }
 
 func (a *AnalyzerGoquery) removeAllNodesWithSelector(doc *goquery.Selection, selector string) {
@@ -307,6 +347,7 @@ func (a *AnalyzerGoquery) removeAllNodesWithSelector(doc *goquery.Selection, sel
 func (a *AnalyzerGoquery) cleanScripts(doc *goquery.Selection) {
 	a.removeAllNodesWithSelector(doc, "script")
 	a.removeAllNodesWithSelector(doc, "noscript")
+	a.removeAllNodesWithSelector(doc, "style")
 }
 
 func (a *AnalyzerGoquery) cleanUnecessary(doc *goquery.Selection) {
@@ -326,6 +367,30 @@ func (a *AnalyzerGoquery) cleanUnecessary(doc *goquery.Selection) {
 	a.removeAllNodesWithSelector(doc, "fieldset")
 }
 
-func (a *AnalyzerGoquery) cleanPresentational(doc *goquery.Document) {
-	doc.Find("style").Remove()
+func (a *AnalyzerGoquery) cleanPresentational(s *goquery.Selection) {
+	s.RemoveAttr("class")
+	s.RemoveAttr("width")
+	s.RemoveAttr("height")
+
+	for _, attribute := range presentationalAttributes {
+		s.RemoveAttr(attribute)
+	}
+	s.Children().Each(func(_ int, child *goquery.Selection) {
+		a.cleanPresentational(child)
+	})
+}
+
+// Have to use it before we clean classes otherwise we're done brah
+func (a *AnalyzerGoquery) cleanShare(s *goquery.Selection) {
+	s.Children().Each(func(_ int, s *goquery.Selection) {
+		class, _ := s.Attr("class")
+		id, _ := s.Attr("id")
+
+		string := class + id
+		// if we have any "share" element lets remove the child that contains it
+		tresholdMet := len(s.Text()) < a.TextTreshold
+		if tresholdMet && shareElements.Match([]byte(string)) {
+			s.Remove()
+		}
+	})
 }
